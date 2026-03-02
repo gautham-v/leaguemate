@@ -5,6 +5,7 @@ import { computePlayerSeasonPoints } from '../utils/draftCalculations';
 import { computeFranchiseOutlook, computeAllTeamWeightedAges } from '../utils/franchiseOutlook';
 import type {
   FranchiseOutlookResult,
+  FranchiseOutlookRawContext,
   FutureDraftPick,
   SleeperPlayer,
   FCPlayerEntry,
@@ -54,10 +55,15 @@ function computeLeagueAwareReplacementLevel(
   return result;
 }
 
+export interface FranchiseOutlookData {
+  outlookMap: Map<string, FranchiseOutlookResult>;
+  rawContext: FranchiseOutlookRawContext;
+}
+
 export function useFranchiseOutlook(leagueId: string | null) {
   return useQuery({
     queryKey: ['franchise-outlook', leagueId],
-    queryFn: async (): Promise<Map<string, FranchiseOutlookResult>> => {
+    queryFn: async (): Promise<FranchiseOutlookData> => {
       // 1. Fetch league metadata, rosters, users, all players, traded picks in parallel
       const [league, rosters, leagueUsers, allPlayers, tradedPicks] = await Promise.all([
         sleeperApi.getLeague(leagueId!),
@@ -205,7 +211,7 @@ export function useFranchiseOutlook(leagueId: string | null) {
       );
 
       // 10. Compute per-manager outlook
-      const results = new Map<string, FranchiseOutlookResult>();
+      const outlookMap = new Map<string, FranchiseOutlookResult>();
       for (const roster of validRosters) {
         const result = computeFranchiseOutlook(
           roster,
@@ -228,10 +234,29 @@ export function useFranchiseOutlook(leagueId: string | null) {
           positionRanksByRoster,
           picksByRosterId,
         );
-        results.set(roster.owner_id!, result);
+        outlookMap.set(roster.owner_id!, result);
       }
 
-      return results;
+      const rawContext: FranchiseOutlookRawContext = {
+        allPlayers,
+        playerWARMap,
+        allTeamWARs,
+        allTeamWeightedAges,
+        isSeasonComplete,
+        leagueAvgWARByPosition,
+        allRosters: validRosters,
+        userDisplayNames,
+        userAvatars,
+        teamPositionWAR,
+        positionRanksByRoster,
+        picksByRosterId,
+        fcMap,
+        rookiePool,
+        warRankByRoster,
+        winsRankByRoster,
+      };
+
+      return { outlookMap, rawContext };
     },
     enabled: !!leagueId,
     staleTime: 1000 * 60 * 30,

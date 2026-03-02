@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -9,16 +10,22 @@ import {
   Tooltip,
   ReferenceLine,
 } from 'recharts';
+import { ArrowLeftRight } from 'lucide-react';
 import type {
   FranchiseOutlookResult,
   FranchiseTier,
   StrategyMode,
+  FranchiseOutlookRawContext,
 } from '../types/sleeper';
 import { MetricTooltip } from '@/components/MetricTooltip';
+import { useTradeSimulator } from '../hooks/useTradeSimulator';
+import { TradeSimulatorPanel } from './TradeSimulatorPanel';
 
 interface FranchiseOutlookTabProps {
   userId: string;
   data: Map<string, FranchiseOutlookResult>;
+  leagueId?: string;
+  rawContext?: FranchiseOutlookRawContext;
 }
 
 // ── Color helpers ────────────────────────────────────────────────────────────
@@ -93,8 +100,10 @@ function SummaryCard({ label, children }: { label: React.ReactNode; children: Re
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-export function FranchiseOutlookTab({ userId, data }: FranchiseOutlookTabProps) {
+export function FranchiseOutlookTab({ userId, data, leagueId: _leagueId, rawContext }: FranchiseOutlookTabProps) {
   const result = data.get(userId);
+  const [simulatorOpen, setSimulatorOpen] = useState(false);
+  const simulator = useTradeSimulator(userId, rawContext, result ?? null);
 
   if (!result) {
     return (
@@ -201,6 +210,22 @@ export function FranchiseOutlookTab({ userId, data }: FranchiseOutlookTabProps) 
           </div>
         </div>
       </div>
+
+      {/* ── Test a Trade CTA ── */}
+      {rawContext && (
+        <div className="flex justify-center">
+          <button
+            onClick={() => setSimulatorOpen((o) => !o)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-cyan/10 border border-brand-cyan/30 text-brand-cyan text-sm font-medium hover:bg-brand-cyan/20 transition-colors"
+          >
+            <ArrowLeftRight size={16} />
+            {simulatorOpen ? 'Close Simulator' : 'Test a Trade'}
+          </button>
+        </div>
+      )}
+      {simulatorOpen && rawContext && (
+        <TradeSimulatorPanel simulator={simulator} mode="inline" />
+      )}
 
       {/* ── Focus Areas ── */}
       {focusAreas.length > 0 && (
@@ -488,7 +513,14 @@ export function FranchiseOutlookTab({ userId, data }: FranchiseOutlookTabProps) 
                           <div key={o.position} className="flex items-start gap-1.5">
                             <PosBadge pos={o.position} />
                             <div>
-                              {o.topPlayer && <div className="text-emerald-300 font-medium">{o.topPlayer}</div>}
+                              {o.topPlayer && (
+                                <div className="flex items-baseline gap-1.5">
+                                  <span className="text-emerald-300 font-medium">{o.topPlayer}</span>
+                                  {o.topPlayerValue != null && o.topPlayerValue > 0 && (
+                                    <span className="text-yellow-400 tabular-nums">{Math.round(o.topPlayerValue).toLocaleString()}</span>
+                                  )}
+                                </div>
+                              )}
                               <span className="text-emerald-500">#{o.rank} · +{o.delta.toFixed(1)} WAR</span>
                             </div>
                           </div>
@@ -504,7 +536,14 @@ export function FranchiseOutlookTab({ userId, data }: FranchiseOutlookTabProps) 
                           <div key={o.position} className="flex items-start gap-1.5">
                             <PosBadge pos={o.position} />
                             <div>
-                              {o.topPlayer && <div className="text-brand-cyan font-medium">{o.topPlayer}</div>}
+                              {o.topPlayer && (
+                                <div className="flex items-baseline gap-1.5">
+                                  <span className="text-brand-cyan font-medium">{o.topPlayer}</span>
+                                  {o.topPlayerValue != null && o.topPlayerValue > 0 && (
+                                    <span className="text-yellow-400 tabular-nums">{Math.round(o.topPlayerValue).toLocaleString()}</span>
+                                  )}
+                                </div>
+                              )}
                               <span className="text-brand-cyan/60">#{o.rank} · +{o.delta.toFixed(1)} WAR</span>
                             </div>
                           </div>

@@ -360,7 +360,7 @@ function topPlayerAtPosition(
   allPlayers: Record<string, SleeperPlayer>,
   playerWARMap: Map<string, number>,
   fcMap: Map<string, number>,
-): string | undefined {
+): { name: string; value: number } | undefined {
   let best: { name: string; score: number } | null = null;
   for (const pid of rosterPlayerIds) {
     const p = allPlayers[pid];
@@ -371,7 +371,7 @@ function topPlayerAtPosition(
     const score = fc > 0 ? fc : Math.max(war, 0) * 500;
     if (!best || score > best.score) best = { name, score };
   }
-  return best?.name;
+  return best ? { name: best.name, value: best.score } : undefined;
 }
 
 function computeTradePartners(
@@ -402,8 +402,8 @@ function computeTradePartners(
     const theirRanks = positionRanksByRoster.get(roster.roster_id) ?? new Map<string, number>();
     const theirPlayerIds = roster.players ?? [];
 
-    const theyCanOffer: { position: string; rank: number; delta: number; topPlayer?: string }[] = [];
-    const youCanOffer: { position: string; rank: number; delta: number; topPlayer?: string }[] = [];
+    const theyCanOffer: { position: string; rank: number; delta: number; topPlayer?: string; topPlayerValue?: number }[] = [];
+    const youCanOffer: { position: string; rank: number; delta: number; topPlayer?: string; topPlayerValue?: number }[] = [];
     let score = 0;
 
     for (const pos of POSITIONS) {
@@ -420,29 +420,41 @@ function computeTradePartners(
       const theirDeficit = avgWAR - theirWARVal;
 
       if (myDeficit > 0 && theirSurplus > 0) {
-        const topPlayer = topPlayerAtPosition(theirPlayerIds, pos, allPlayers, playerWARMap, fcMap);
+        const top = topPlayerAtPosition(theirPlayerIds, pos, allPlayers, playerWARMap, fcMap);
         theyCanOffer.push({
           position: pos,
           rank: theirRank,
           delta: Math.round(theirSurplus * 10) / 10,
-          topPlayer,
+          topPlayer: top?.name,
+          topPlayerValue: top?.value,
         });
         score += myDeficit * theirSurplus;
       }
 
       if (mySurplus > 0 && theirDeficit > 0) {
-        const topPlayer = topPlayerAtPosition(thisRosterPlayerIds, pos, allPlayers, playerWARMap, fcMap);
+        const top = topPlayerAtPosition(thisRosterPlayerIds, pos, allPlayers, playerWARMap, fcMap);
         youCanOffer.push({
           position: pos,
           rank: myRank,
           delta: Math.round(mySurplus * 10) / 10,
-          topPlayer,
+          topPlayer: top?.name,
+          topPlayerValue: top?.value,
         });
         score += mySurplus * theirDeficit;
       }
     }
 
     if (theyCanOffer.length === 0 && youCanOffer.length === 0) continue;
+
+    const FAIRNESS_THRESHOLD = 0.70;
+    if (theyCanOffer.length > 0 && youCanOffer.length > 0) {
+      const topTheyValue = [...theyCanOffer].sort((a, b) => b.delta - a.delta)[0]?.topPlayerValue ?? 0;
+      const topYouValue  = [...youCanOffer].sort((a, b) => b.delta - a.delta)[0]?.topPlayerValue ?? 0;
+      if (topTheyValue > 0 && topYouValue > 0) {
+        const ratio = Math.min(topTheyValue, topYouValue) / Math.max(topTheyValue, topYouValue);
+        if (ratio < FAIRNESS_THRESHOLD) continue;
+      }
+    }
 
     const topTheyOffer = [...theyCanOffer].sort((a, b) => b.delta - a.delta)[0];
     const topYouOffer = [...youCanOffer].sort((a, b) => b.delta - a.delta)[0];

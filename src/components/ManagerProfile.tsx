@@ -203,7 +203,7 @@ export function ManagerProfile({ leagueId, userId, onBack, onSelectManager, onVi
   const draftGradeColor = draftAnalysis.data?.managerSummaries.get(userId)?.gradeColor ?? null;
   const tradeGrade = tradeAnalysis.data?.managerSummaries.get(userId)?.grade ?? null;
   const tradeGradeColor = tradeAnalysis.data?.managerSummaries.get(userId)?.gradeColor ?? null;
-  const rosterAge = franchiseOutlook.data?.get(userId)?.weightedAge ?? null;
+  const rosterAge = franchiseOutlook.data?.outlookMap.get(userId)?.weightedAge ?? null;
 
   return (
     <div className="space-y-6 pb-24">
@@ -739,7 +739,12 @@ export function ManagerProfile({ leagueId, userId, onBack, onSelectManager, onVi
               Computing franchise outlook…
             </div>
           ) : franchiseOutlook.data ? (
-            <FranchiseOutlookTab userId={userId} data={franchiseOutlook.data} />
+            <FranchiseOutlookTab
+              userId={userId}
+              leagueId={leagueId}
+              data={franchiseOutlook.data.outlookMap}
+              rawContext={franchiseOutlook.data.rawContext}
+            />
           ) : (
             <div className="bg-card-bg border border-card-border rounded-2xl p-8 text-center">
               <div className="text-2xl mb-3">🔭</div>
