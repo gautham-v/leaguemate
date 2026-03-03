@@ -130,11 +130,11 @@ export function FranchiseOutlookTab({ userId, data, leagueId: _leagueId, rawCont
   const yMin = Math.floor(Math.min(...allWARValues, contenderThreshold) - 5);
   const yMax = Math.ceil(Math.max(...allWARValues, contenderThreshold) + 5);
 
-  // Future picks grouped by year
-  const picksByYear = new Map<string, number[]>();
+  // Future picks grouped by year, sorted by round then slot
+  const picksByYear = new Map<string, typeof futurePicks>();
   for (const pick of futurePicks) {
     const arr = picksByYear.get(pick.season) ?? [];
-    arr.push(pick.round);
+    arr.push(pick);
     picksByYear.set(pick.season, arr);
   }
   const sortedPickYears = [...picksByYear.keys()].sort();
@@ -279,11 +279,18 @@ export function FranchiseOutlookTab({ userId, data, leagueId: _leagueId, rawCont
           ) : (
             <div className="mt-1 space-y-0.5">
               {sortedPickYears.map((year) => {
-                const rounds = [...(picksByYear.get(year) ?? [])].sort((a, b) => a - b);
+                const picks = [...(picksByYear.get(year) ?? [])].sort((a, b) => {
+                  if (a.round !== b.round) return a.round - b.round;
+                  return (a.slot ?? 99) - (b.slot ?? 99);
+                });
                 return (
                   <div key={year} className="text-xs text-gray-400 leading-tight">
                     <span className="text-gray-500">{year}:</span>{' '}
-                    {rounds.map((r) => `Rd ${r}`).join(', ')}
+                    {picks.map((p) =>
+                      p.slot != null
+                        ? `${p.round}.${p.slot.toString().padStart(2, '0')}`
+                        : `Rd ${p.round}`
+                    ).join(', ')}
                   </div>
                 );
               })}

@@ -64,13 +64,14 @@ export function useFranchiseOutlook(leagueId: string | null) {
   return useQuery({
     queryKey: ['franchise-outlook', leagueId],
     queryFn: async (): Promise<FranchiseOutlookData> => {
-      // 1. Fetch league metadata, rosters, users, all players, traded picks in parallel
-      const [league, rosters, leagueUsers, allPlayers, tradedPicks] = await Promise.all([
+      // 1. Fetch league metadata, rosters, users, all players, traded picks, drafts in parallel
+      const [league, rosters, leagueUsers, allPlayers, tradedPicks, drafts] = await Promise.all([
         sleeperApi.getLeague(leagueId!),
         sleeperApi.getRosters(leagueId!),
         sleeperApi.getLeagueUsers(leagueId!),
         sleeperApi.getAllPlayers(),
         sleeperApi.getTradedPicks(leagueId!),
+        sleeperApi.getDrafts(leagueId!),
       ]);
 
       const playoffStart = league.settings.playoff_week_start || 15;
@@ -141,13 +142,27 @@ export function useFranchiseOutlook(leagueId: string | null) {
       );
       const allTeamWeightedAges = computeAllTeamWeightedAges(validRosters, allPlayers, playerWARMap);
 
-      // 6. Future picks by roster
+      // 6. Build pick slot map from upcoming drafts (roster_id → slot number per season)
+      // slot_to_roster_id maps { "1": rosterId, "2": rosterId, ... } — invert it
+      const rosterToSlotBySeason = new Map<string, Map<number, number>>();
+      for (const draft of drafts) {
+        if (!draft.slot_to_roster_id) continue;
+        const slotMap = new Map<number, number>();
+        for (const [slot, rosterId] of Object.entries(draft.slot_to_roster_id)) {
+          slotMap.set(rosterId, parseInt(slot));
+        }
+        rosterToSlotBySeason.set(draft.season, slotMap);
+      }
+
+      // 7. Future picks by roster, annotated with slot number when available
       const picksByRosterId = new Map<number, FutureDraftPick[]>();
       for (const pick of tradedPicks) {
         if (pick.owner_id == null) continue;
         if (parseInt(pick.season) <= parseInt(league.season ?? '0')) continue;
+        const slot = rosterToSlotBySeason.get(pick.season)?.get(pick.roster_id);
+        const annotatedPick: FutureDraftPick = slot != null ? { ...pick, slot } : pick;
         const arr = picksByRosterId.get(pick.owner_id) ?? [];
-        arr.push(pick);
+        arr.push(annotatedPick);
         picksByRosterId.set(pick.owner_id, arr);
       }
 

@@ -52,6 +52,7 @@ export interface FutureDraftPick {
   roster_id: number;
   previous_owner_id: number | null;
   owner_id: number | null;
+  slot?: number; // pick slot within the round (1 = first overall), populated when draft order is known
 }
 
 export interface SleeperLeagueUser {
