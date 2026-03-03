@@ -484,6 +484,8 @@ export interface RookieDraftTarget {
   overallRank: number;
   positionRank: number;
   reason: string;
+  estimatedPeakWAR: number;  // approximate peak-year WAR from dynasty value
+  impactSummary: string;     // projected effect on position room and contender window
 }
 
 export interface TradeTargetPlayer {

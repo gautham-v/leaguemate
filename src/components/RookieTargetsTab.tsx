@@ -100,6 +100,13 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
                     </span>
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">{t.reason}</div>
+                  <div className="flex items-center gap-3 mt-1.5">
+                    <span className="text-xs text-brand-cyan/80">
+                      ~{t.estimatedPeakWAR.toFixed(1)} est. peak WAR
+                    </span>
+                    <span className="text-xs text-gray-600">·</span>
+                    <span className="text-xs text-gray-400">{t.impactSummary}</span>
+                  </div>
                 </div>
               </div>
             ))}

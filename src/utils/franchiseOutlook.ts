@@ -221,6 +221,28 @@ function computeRookieDraftTargets(
       ? `Your ${pos} group is #${posNeed.rank} in league${posNeed.avgAge > 27 && posNeed.avgAge > 0 ? ` (avg age ${posNeed.avgAge.toFixed(0)})` : ''} — target young ${pos}s early.`
       : `Add depth at ${pos}.`;
 
+    // Franchise impact estimates
+    // Dynasty value ≈ 450 per WAR at peak (4500 = elite ~10 WAR, 1000 = depth ~2 WAR)
+    const estimatedPeakWAR = Math.round((rookie.value / 450) * 10) / 10;
+    let impactSummary: string;
+    if (posNeed) {
+      const currentWAR = Math.max(posNeed.war, 0);
+      const delta = estimatedPeakWAR - currentWAR;
+      if (delta > 4) {
+        impactSummary = `Franchise-altering at ${pos} — projects top-3 in league at peak`;
+      } else if (delta > 2) {
+        impactSummary = `Projects to push ${pos} room from #${posNeed.rank} to top-half of league`;
+      } else if (delta > 0.5) {
+        impactSummary = `Meaningful upgrade at ${pos} — narrows gap from #${posNeed.rank}`;
+      } else {
+        impactSummary = `Depth addition at ${pos} — adds pipeline to aging room`;
+      }
+    } else {
+      impactSummary = estimatedPeakWAR > 5
+        ? `Elite prospect — projects ~${estimatedPeakWAR.toFixed(1)} peak WAR`
+        : `Adds depth and future flexibility`;
+    }
+
     results.push({
       name: rookie.player.name,
       position: pos,
@@ -228,6 +250,8 @@ function computeRookieDraftTargets(
       overallRank: rookie.overallRank,
       positionRank: rookie.positionRank,
       reason,
+      estimatedPeakWAR,
+      impactSummary,
     });
     positionCounts.set(pos, posCount + 1);
   }
