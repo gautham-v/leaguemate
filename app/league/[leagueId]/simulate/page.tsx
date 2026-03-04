@@ -26,7 +26,7 @@ interface SimulateContentProps {
   data: FranchiseOutlookData;
 }
 
-function SimulateContent({ leagueId: _leagueId, userId, data }: SimulateContentProps) {
+function SimulateContent({ userId, data }: SimulateContentProps) {
   const beforeOutlook: FranchiseOutlookResult | null = data.outlookMap.get(userId) ?? null;
   const rawContext: FranchiseOutlookRawContext = data.rawContext;
 

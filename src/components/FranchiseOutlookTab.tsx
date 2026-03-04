@@ -96,7 +96,7 @@ function SummaryCard({ label, children }: { label: React.ReactNode; children: Re
 
 // ── Main component ───────────────────────────────────────────────────────────
 
-export function FranchiseOutlookTab({ userId, data, leagueId: _leagueId, rawContext: _rawContext }: FranchiseOutlookTabProps) {
+export function FranchiseOutlookTab({ userId, data }: FranchiseOutlookTabProps) {
   const result = data.get(userId);
 
   if (!result) {
