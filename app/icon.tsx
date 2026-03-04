@@ -19,17 +19,11 @@ export default function Icon() {
           border: '1px solid #27272a',
         }}
       >
-        <span
-          style={{
-            color: '#fafafa',
-            fontSize: 13,
-            fontWeight: 800,
-            fontFamily: 'sans-serif',
-            lineHeight: 1,
-          }}
-        >
-          lm
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <div style={{ width: 20, height: 3, background: '#fafafa', borderRadius: 2 }} />
+          <div style={{ width: 11, height: 3, background: '#fafafa', borderRadius: 2 }} />
+          <div style={{ width: 20, height: 3, background: '#fafafa', borderRadius: 2 }} />
+        </div>
       </div>
     ),
     { width: 32, height: 32 }

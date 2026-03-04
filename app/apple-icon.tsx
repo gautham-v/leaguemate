@@ -18,17 +18,11 @@ export default function AppleIcon() {
           borderRadius: 40,
         }}
       >
-        <span
-          style={{
-            color: '#fafafa',
-            fontSize: 72,
-            fontWeight: 800,
-            fontFamily: 'sans-serif',
-            lineHeight: 1,
-          }}
-        >
-          lm
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
+          <div style={{ width: 112, height: 16, background: '#fafafa', borderRadius: 8 }} />
+          <div style={{ width: 62, height: 16, background: '#fafafa', borderRadius: 8 }} />
+          <div style={{ width: 112, height: 16, background: '#fafafa', borderRadius: 8 }} />
+        </div>
       </div>
     ),
     { width: 180, height: 180 }
