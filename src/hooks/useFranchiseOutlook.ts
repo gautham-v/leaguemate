@@ -345,7 +345,7 @@ export function useFranchiseOutlook(leagueId: string | null) {
       return { outlookMap, rawContext };
     },
     enabled: !!leagueId,
-    staleTime: 1000 * 60 * 30,
-    gcTime: 1000 * 60 * 60,
+    staleTime: THIRTY_MIN_MS,
+    gcTime: ONE_HOUR_MS,
   });
 }

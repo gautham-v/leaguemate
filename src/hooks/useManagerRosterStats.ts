@@ -32,7 +32,7 @@ async function getPlayerDatabase(): Promise<Record<string, SleeperPlayer>> {
     const raw = localStorage.getItem(PLAYERS_CACHE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Date.now() - parsed.cachedAt < PLAYERS_CACHE_TTL_MS) {
+      if (Date.now() - parsed.cachedAt < SEVEN_DAYS_MS) {
         return parsed.players;
       }
     }
@@ -166,7 +166,7 @@ export function useManagerRosterStats(leagueId: string, userId: string) {
       return result;
     },
     enabled: !!leagueId && !!userId,
-    staleTime: 1000 * 60 * 30,
-    gcTime: 1000 * 60 * 60,
+    staleTime: THIRTY_MIN_MS,
+    gcTime: ONE_HOUR_MS,
   });
 }

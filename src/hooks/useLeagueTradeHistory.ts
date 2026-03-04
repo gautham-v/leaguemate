@@ -209,6 +209,6 @@ export function useLeagueTradeHistory(leagueId: string | null) {
     queryKey: ['league-trade-history', leagueId],
     queryFn: () => fetchLeagueTradeAnalysis(leagueId!),
     enabled: !!leagueId,
-    staleTime: 1000 * 60 * 30,
+    staleTime: THIRTY_MIN_MS,
   });
 }

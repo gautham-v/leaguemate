@@ -147,6 +147,6 @@ export function useLeagueDraftHistory(leagueId: string | null) {
     queryKey: ['league-draft-history', leagueId],
     queryFn: () => fetchLeagueDraftAnalysis(leagueId!),
     enabled: !!leagueId,
-    staleTime: 1000 * 60 * 30,
+    staleTime: THIRTY_MIN_MS,
   });
 }

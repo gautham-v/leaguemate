@@ -137,7 +137,7 @@ export function useAllTimeWAR(leagueId: string | null) {
       return result;
     },
     enabled: !!leagueId,
-    staleTime: 1000 * 60 * 30, // 30 min in-memory staleness
-    gcTime: 1000 * 60 * 60,    // 1 hour GC
+    staleTime: THIRTY_MIN_MS,
+    gcTime: ONE_HOUR_MS,
   });
 }
