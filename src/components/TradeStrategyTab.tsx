@@ -5,6 +5,7 @@ import { useFranchiseOutlook } from '@/hooks/useFranchiseOutlook';
 import { useRosters, useLeagueUsers } from '@/hooks/useLeagueData';
 import { useSessionUser } from '@/hooks/useSessionUser';
 import { useState, useMemo } from 'react';
+import type { TradeTargetPlayer, TradeTargetPick } from '@/types/sleeper';
 
 const POSITION_COLORS: Record<string, string> = {
   QB: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/50 dark:text-red-300 dark:border-red-800/50',
@@ -59,12 +60,12 @@ export function TradeStrategyTab({ leagueId }: TradeStrategyTabProps) {
   const result = outlookMap?.get(effectiveUserId);
 
   // Normalize tradeTargets to always be {players, picks} regardless of data format
-  const tradeTargets = useMemo(() => {
+  const tradeTargets = useMemo((): { players: TradeTargetPlayer[]; picks: TradeTargetPick[] } => {
     if (!result?.tradeTargets) return { players: [], picks: [] };
     if (Array.isArray(result.tradeTargets)) {
-      return { players: result.tradeTargets as any[], picks: [] };
+      return { players: result.tradeTargets as TradeTargetPlayer[], picks: [] };
     }
-    return result.tradeTargets as { players: any[]; picks: any[] };
+    return result.tradeTargets as { players: TradeTargetPlayer[]; picks: TradeTargetPick[] };
   }, [result?.tradeTargets]);
 
   if (isLoading) {
