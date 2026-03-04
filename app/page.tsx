@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import posthog from 'posthog-js';
 import { Loader2, Trophy, TrendingUp, Target, ArrowLeftRight, ClipboardList } from 'lucide-react';
 import { AboutModal } from '@/components/AboutModal';
 import { ContactModal } from '@/components/ContactModal';
@@ -101,6 +102,11 @@ export default function HomePage() {
         displayName: user.display_name,
         avatar: user.avatar ?? null,
         leagueGroups: byRecent,
+      });
+
+      posthog.identify(user.user_id, {
+        username: trimmed,
+        display_name: user.display_name,
       });
 
       // Navigate to the most recent season of the longest-tenured league

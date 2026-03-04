@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { PostHogPageView } from '@/src/components/PostHogPageView';
 import { Providers } from './providers';
 import './globals.css';
 
@@ -28,7 +30,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Providers>{children}</Providers>
+        <Providers>
+          <Suspense>
+            <PostHogPageView />
+          </Suspense>
+          {children}
+        </Providers>
       </body>
     </html>
   );
