@@ -492,7 +492,9 @@ export function TradeSimulatorPanel({ simulator, mode = 'inline' }: TradeSimulat
         </div>
 
         {/* ── Mobile: tab switcher ── */}
-        <div className="sm:hidden flex border-b border-gray-700/50 mb-4 -mx-1">
+        {/* Outer div uses only sm:hidden (no competing display class) to avoid Tailwind v4 cascade conflict */}
+        <div className="sm:hidden">
+        <div className="flex border-b border-gray-700/50 mb-4 -mx-1">
           {(['give', 'receive'] as const).map((side) => (
             <button
               key={side}
@@ -518,6 +520,7 @@ export function TradeSimulatorPanel({ simulator, mode = 'inline' }: TradeSimulat
               )}
             </button>
           ))}
+        </div>
         </div>
 
         {/* ── Mobile: single active column ── */}
