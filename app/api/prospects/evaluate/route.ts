@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, HistoricalRookie } from '@/lib/supabase';
 import { evaluateProspect } from '@/utils/prospectEvaluator';
 
 export async function POST(req: NextRequest) {
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Fetch all historical rookies for this position (paginated past 1000-row limit)
-    const historicalPool = [];
+    const historicalPool: HistoricalRookie[] = [];
     const PAGE_SIZE = 1000;
     let offset = 0;
     while (true) {
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         .range(offset, offset + PAGE_SIZE - 1);
       if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
       if (!data || data.length === 0) break;
-      historicalPool.push(...data);
+      historicalPool.push(...(data as HistoricalRookie[]));
       if (data.length < PAGE_SIZE) break;
       offset += PAGE_SIZE;
     }
@@ -48,7 +48,8 @@ export async function POST(req: NextRequest) {
 
     // 3. Persist if requested
     if (persist && draftYear) {
-      const { error: upsertError } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: upsertError } = await (supabase as any)
         .from('prospect_profiles')
         .upsert(
           {

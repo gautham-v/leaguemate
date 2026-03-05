@@ -17,7 +17,7 @@ export function getSupabase() {
 /** @deprecated Use getSupabase() instead */
 export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
   get(_, prop) {
-    return (getSupabase() as Record<string | symbol, unknown>)[prop];
+    return (getSupabase() as unknown as Record<string | symbol, unknown>)[prop];
   },
 });
 
