@@ -22,7 +22,7 @@ export default function DraftPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const router = useRouter();
   const { isRookieSeason, daysUntilDraft, showCountdown } = getRookieSeasonDefaults();
-  const [activeTab, setActiveTab] = useState<DraftPageTab>(isRookieSeason ? 'rookies' : 'analysis');
+  const [activeTab, setActiveTab] = useState<DraftPageTab>('rookies');
 
   return (
     <div>
@@ -48,16 +48,6 @@ export default function DraftPage() {
 
       <div className="flex border-b border-card-border mb-6">
         <button
-          onClick={() => setActiveTab('analysis')}
-          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-            activeTab === 'analysis'
-              ? 'border-brand-cyan text-white'
-              : 'border-transparent text-muted-foreground hover:text-white'
-          }`}
-        >
-          Draft Leaderboard
-        </button>
-        <button
           onClick={() => setActiveTab('rookies')}
           className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
             activeTab === 'rookies'
@@ -66,6 +56,16 @@ export default function DraftPage() {
           }`}
         >
           Draft Board
+        </button>
+        <button
+          onClick={() => setActiveTab('analysis')}
+          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            activeTab === 'analysis'
+              ? 'border-brand-cyan text-white'
+              : 'border-transparent text-muted-foreground hover:text-white'
+          }`}
+        >
+          Draft Leaderboard
         </button>
       </div>
 
