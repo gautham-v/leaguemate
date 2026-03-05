@@ -144,10 +144,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ targets: archetypes, isPreDraft: true });
     }
 
-    // 5. Score each real prospect
+    // 5. Compute class-relative ranks (within 2026 class, not global dynasty rank)
+    //    Also derive estimated NFL draft pick from class rank for comp matching.
+    //    All 2026 prospects have draft_pick=null pre-draft, so without this the
+    //    computeDistance() fallback returns 1.0 for everyone → identical comps.
+    const prospectsTyped = prospects as ProspectProfile[];
+    const sortedByValue = [...prospectsTyped].sort(
+      (a, b) => (b.fantasycalc_value ?? 0) - (a.fantasycalc_value ?? 0),
+    );
+    const classRankMap = new Map<string, number>();
+    const classPosRankMap = new Map<string, number>();
+    const posCounter: Record<string, number> = {};
+    for (let i = 0; i < sortedByValue.length; i++) {
+      const p = sortedByValue[i];
+      classRankMap.set(p.name, i + 1);
+      posCounter[p.position] = (posCounter[p.position] ?? 0) + 1;
+      classPosRankMap.set(p.name, posCounter[p.position]);
+    }
+
+    // 6. Score each real prospect
     const targets: DraftBoardTarget[] = [];
 
-    for (const prospect of prospects as ProspectProfile[]) {
+    for (const prospect of prospectsTyped) {
+      const classRank = classRankMap.get(prospect.name) ?? 99;
+      const classPosRank = classPosRankMap.get(prospect.name) ?? 99;
+
+      // For pre-draft prospects with no confirmed NFL pick, estimate from class rank.
+      // Class rank 1 ≈ top NFL pick, class rank 12 ≈ late round 1 / early round 2, etc.
+      const estimatedPick = prospect.draft_pick ?? classRank;
+      const estimatedRound = prospect.draft_round ?? Math.min(7, Math.ceil(classRank / 12));
+
       // Use cached comp results if available, else compute in memory
       let compResults: CompResults;
       if (prospect.comp_results_json) {
@@ -157,8 +183,8 @@ export async function POST(req: NextRequest) {
         compResults = evaluateProspect(
           {
             position: prospect.position,
-            draftRound: prospect.draft_round ?? undefined,
-            draftPick: prospect.draft_pick ?? undefined,
+            draftRound: estimatedRound,
+            draftPick: estimatedPick,
           },
           posPool,
         );
@@ -167,7 +193,7 @@ export async function POST(req: NextRequest) {
       const scoring = scoreDraftTarget({
         position: prospect.position,
         dynastyValue: prospect.fantasycalc_value ?? 0,
-        overallRank: prospect.overall_rank ?? 99,
+        overallRank: classRank, // use class-relative rank for surplus calc
         compResults,
         warByPosition,
         tier,
@@ -178,9 +204,9 @@ export async function POST(req: NextRequest) {
         name: prospect.name,
         position: prospect.position,
         dynastyValue: prospect.fantasycalc_value ?? 0,
-        overallRank: prospect.overall_rank ?? 99,
-        positionRank: prospect.position_rank ?? 99,
-        draftRound: prospect.draft_round ?? undefined,
+        overallRank: classRank,
+        positionRank: classPosRank,
+        draftRound: prospect.draft_round ?? estimatedRound,
         draftPick: prospect.draft_pick ?? undefined,
         targetScore: scoring.targetScore,
         pStarter: scoring.pStarter,

@@ -1,15 +1,13 @@
 /**
  * 2026 Prospect Seeding Script
  *
- * Fetches FantasyCalc dynasty values to identify the incoming rookie class
- * and upserts them into `prospect_profiles`.
+ * Fetches FantasyCalc dynasty values to identify the incoming rookie class.
+ * Works both pre-draft (yoe=0, no team) and post-draft (yoe=0, has team).
  *
- * NOTE: Run this AFTER the NFL Draft (late April 2026). FantasyCalc only adds
- * rookies once they're officially drafted. Pre-draft, prospects don't appear
- * in the values endpoint. After the draft, new rookies show up with yoe=0.
+ * Pre-draft: prospects appear with yoe=0 and no NFL team.
+ * Post-draft: prospects appear with yoe=0 and an NFL team assigned.
  *
  * Run: npx tsx scripts/seed-2026-prospects.ts
- *
  * Env required: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
  */
 
@@ -50,7 +48,7 @@ interface FantasyCalcEntry {
   player: FantasyCalcPlayer;
   value: number;
   overallRank: number;
-  positionalRank: number;
+  positionRank: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,8 +91,6 @@ async function main() {
       player.maybeYoe != null && player.maybeYoe > 0;
     if (hasNflExp) return false;
 
-    // Post-draft: yoe=0 correctly identifies current-year rookies.
-    // Sleeper check not needed — newly drafted players will have Sleeper IDs.
     return true;
   });
 
@@ -110,18 +106,28 @@ async function main() {
   console.log('-'.repeat(60));
 
   for (const entry of prospects) {
-    const { player, value, overallRank, positionalRank } = entry;
+    const { player, value, overallRank, positionRank } = entry;
     console.log(
       String(overallRank).padEnd(6) +
       player.position.padEnd(5) +
-      String(positionalRank).padEnd(9) +
+      String(positionRank).padEnd(9) +
       String(value).padEnd(8) +
       player.name
     );
   }
 
-  // Step 5: Upsert to prospect_profiles
-  console.log(`\nUpserting ${prospects.length} prospects to prospect_profiles...`);
+  // Step 5: Clear old data and insert fresh from FantasyCalc
+  console.log(`\nClearing existing ${DRAFT_YEAR} rows...`);
+  const { error: deleteError } = await supabase
+    .from('prospect_profiles')
+    .delete()
+    .eq('draft_year', DRAFT_YEAR);
+  if (deleteError) {
+    console.error('Delete error:', deleteError);
+    process.exit(1);
+  }
+
+  console.log(`Inserting ${prospects.length} prospects to prospect_profiles...`);
 
   const rows = prospects.map((entry) => ({
     name: entry.player.name,
@@ -130,7 +136,7 @@ async function main() {
     nfl_team: null,
     fantasycalc_value: entry.value,
     overall_rank: entry.overallRank,
-    position_rank: entry.positionalRank,
+    position_rank: entry.positionRank,
     confidence_level: null,
     comp_results_json: null,
     draft_round: null,
@@ -139,7 +145,7 @@ async function main() {
 
   const { error, count } = await supabase
     .from('prospect_profiles')
-    .upsert(rows, { onConflict: 'draft_year,name', count: 'exact' });
+    .insert(rows, { count: 'exact' });
 
   if (error) {
     console.error('Supabase upsert error:', error);

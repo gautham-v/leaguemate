@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, Zap } from 'lucide-react';
+import { Loader2, Zap, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useFranchiseOutlook } from '@/hooks/useFranchiseOutlook';
 import { useRosters, useLeagueUsers } from '@/hooks/useLeagueData';
@@ -9,6 +9,9 @@ import { useState, useMemo } from 'react';
 import { PosBadge } from '@/components/ui/badges';
 import type { DraftBoardRequest, DraftBoardTarget } from '@/types/sleeper';
 import type { CompPlayer } from '@/types/prospects';
+import { sleeperApi } from '@/api/sleeper';
+
+const PAGE_SIZE = 10;
 
 interface RookieTargetsTabProps {
   leagueId: string;
@@ -126,6 +129,7 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
         const user = userMap.get(r.owner_id!);
         return {
           userId: r.owner_id!,
+          rosterId: r.roster_id,
           displayName: user?.metadata?.team_name || user?.display_name || `Team ${r.roster_id}`,
         };
       })
@@ -136,11 +140,11 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
   const [selectedUserId, setSelectedUserId] = useState('');
   const defaultUserId = managers.find((m) => m.userId === sessionUser?.userId)?.userId ?? managers[0]?.userId ?? '';
   const effectiveUserId = selectedUserId || defaultUserId;
+  const effectiveManager = managers.find((m) => m.userId === effectiveUserId);
 
   const userOutlook = outlookData?.outlookMap.get(effectiveUserId);
 
   // Build the request body for the draft-board API
-  // Always defined when effectiveUserId is available; falls back gracefully when outlook is missing
   const draftBoardRequestBody: DraftBoardRequest = {
     draftYear: 2026,
     warByPosition: userOutlook?.warByPosition ?? [],
@@ -167,6 +171,53 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
     staleTime: 30 * 60 * 1000, // 30 minutes
   });
 
+  // Fetch upcoming 2026 dynasty draft to determine the user's pick slots
+  const { data: drafts } = useQuery({
+    queryKey: ['league-drafts', leagueId],
+    queryFn: () => sleeperApi.getDrafts(leagueId),
+    enabled: !!leagueId,
+    staleTime: 60 * 60 * 1000,
+  });
+
+  // Find an upcoming / pre-draft rookie draft for 2026
+  const upcomingDraft = useMemo(() => {
+    if (!drafts) return null;
+    return drafts.find(
+      (d) => d.season === '2026' && (d.status === 'pre_draft' || d.status === 'paused'),
+    ) ?? null;
+  }, [drafts]);
+
+  // Determine which pick slot(s) the user's roster has in this draft
+  const userPickSlots = useMemo(() => {
+    if (!upcomingDraft?.slot_to_roster_id || !effectiveManager) return [];
+    const slots: number[] = [];
+    for (const [slot, rosterId] of Object.entries(upcomingDraft.slot_to_roster_id)) {
+      if (rosterId === effectiveManager.rosterId) {
+        slots.push(Number(slot));
+      }
+    }
+    return slots.sort((a, b) => a - b);
+  }, [upcomingDraft, effectiveManager]);
+
+  const [page, setPage] = useState(0);
+
+  // Which class ranks are within reach of the user's pick slot(s)?
+  // Must be before any early returns to satisfy Rules of Hooks.
+  const reachableRanks = useMemo(() => {
+    if (userPickSlots.length === 0) return new Set<number>();
+    const numTeams = upcomingDraft?.settings.teams ?? 12;
+    const set = new Set<number>();
+    for (const slot of userPickSlots) {
+      const round = Math.ceil(slot / numTeams);
+      const pickInRound = ((slot - 1) % numTeams) + 1;
+      const classRank = (round - 1) * numTeams + pickInRound;
+      for (let r = classRank - 2; r <= classRank + 3; r++) {
+        if (r >= 1) set.add(r);
+      }
+    }
+    return set;
+  }, [userPickSlots, upcomingDraft]);
+
   const anyLoading = isLoading || draftBoardLoading;
 
   if (anyLoading) {
@@ -181,6 +232,9 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
   const targets = draftBoardData?.targets ?? [];
   const isPreDraft = draftBoardData?.isPreDraft ?? false;
 
+  const totalPages = Math.ceil(targets.length / PAGE_SIZE);
+  const pageTargets = targets.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
   return (
     <div className="space-y-4">
       {/* Manager selector */}
@@ -189,8 +243,8 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
           <span className="text-sm text-muted-foreground flex-shrink-0">Viewing:</span>
           <select
             value={effectiveUserId}
-            onChange={(e) => setSelectedUserId(e.target.value)}
-            className="bg-card-bg border border-card-border rounded-lg px-3 py-2 text-sm text-white"
+            onChange={(e) => { setSelectedUserId(e.target.value); setPage(0); }}
+            className="bg-card-bg border border-card-border rounded-lg px-3 py-2 text-sm text-foreground"
           >
             {managers.map((m) => (
               <option key={m.userId} value={m.userId}>
@@ -210,6 +264,22 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
         </div>
       )}
 
+      {/* Pick context banner */}
+      {upcomingDraft && userPickSlots.length > 0 && (
+        <div className="flex items-start gap-2 rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3">
+          <span className="text-blue-300 text-xs leading-relaxed">
+            <span className="font-semibold">Your rookie draft picks:</span>{' '}
+            {userPickSlots.map((slot) => {
+              const numTeams = upcomingDraft.settings.teams ?? 12;
+              const round = Math.ceil(slot / numTeams);
+              const pick = ((slot - 1) % numTeams) + 1;
+              return `${round}.${String(pick).padStart(2, '0')}`;
+            }).join(', ')}
+            {' '}— highlighted targets are realistically available at your picks.
+          </span>
+        </div>
+      )}
+
       {/* Error state */}
       {draftBoardError && !anyLoading && (
         <div className="bg-card-bg border border-card-border rounded-2xl p-8 text-center">
@@ -223,7 +293,7 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
       {/* Targets list */}
       {!draftBoardError && targets.length > 0 ? (
         <div className="bg-card-bg border border-card-border rounded-2xl p-5">
-          <div className="text-sm font-semibold text-white mb-1">Rookie Draft Targets</div>
+          <div className="text-sm font-semibold text-foreground mb-1">Rookie Draft Targets</div>
           <div className="text-xs text-muted-foreground mb-3">
             Ranked by fit for your roster — balances dynasty value, positional need, and timeline
           </div>
@@ -232,72 +302,105 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
             <span className="text-[11px] text-zinc-600">· Impact = when they contribute</span>
             <span className="text-[11px] text-zinc-600">· Comps = similar historical rookies</span>
           </div>
+
           <div className="space-y-4">
-            {targets.map((t, i) => (
-              <div key={i} className="flex items-start gap-2.5">
-                {/* Rank number */}
-                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-card-border flex items-center justify-center mt-0.5">
-                  <span className="text-[10px] font-semibold text-muted-foreground">{i + 1}</span>
-                </div>
+            {pageTargets.map((t, i) => {
+              const globalIdx = page * PAGE_SIZE + i;
+              const isHighlighted = reachableRanks.has(t.overallRank);
+              return (
+                <div
+                  key={globalIdx}
+                  className={`flex items-start gap-2.5 ${isHighlighted ? 'bg-blue-500/5 -mx-2 px-2 py-1 rounded-lg' : ''}`}
+                >
+                  {/* Rank number */}
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5 ${isHighlighted ? 'bg-blue-500/30' : 'bg-card-border'}`}>
+                    <span className="text-[10px] font-semibold text-muted-foreground">{globalIdx + 1}</span>
+                  </div>
 
-                {/* Position badge */}
-                <PosBadge pos={t.position} />
+                  {/* Position badge */}
+                  <PosBadge pos={t.position} />
 
-                {/* Main content */}
-                <div className="flex-1 min-w-0">
-                  {/* Row 1: name + badges */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm text-gray-200 truncate">
-                      {t.isArchetype ? `~${t.name}` : t.name}
-                    </span>
-                    <div className="flex items-center gap-1.5 flex-shrink-0 ml-auto">
-                      <NeedLabelBadge label={t.needLabel} />
-                      <TargetScoreBadge score={t.targetScore} />
+                  {/* Main content */}
+                  <div className="flex-1 min-w-0">
+                    {/* Row 1: name + badges */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm text-foreground truncate">
+                        {t.isArchetype ? `~${t.name}` : t.name}
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-auto">
+                        <NeedLabelBadge label={t.needLabel} />
+                        <TargetScoreBadge score={t.targetScore} />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Row 2: rank info + timeline + surplus */}
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span className="text-xs text-zinc-500">
-                      #{t.overallRank} ovr · #{t.positionRank} {t.position}
-                    </span>
-                    <span className="text-zinc-700 text-xs">·</span>
-                    <TimelineBadge badge={t.timelineBadge} />
-                    {t.surplusFlag && (
-                      <span className="text-xs text-green-400 font-medium">↑ Value</span>
+                    {/* Row 2: rank info + timeline + surplus */}
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-xs text-zinc-500">
+                        #{t.overallRank} in class · #{t.positionRank} {t.position}
+                      </span>
+                      <span className="text-zinc-600 text-xs">·</span>
+                      <TimelineBadge badge={t.timelineBadge} />
+                      {t.surplusFlag && (
+                        <span className="text-xs text-green-400 font-medium">↑ Value</span>
+                      )}
+                    </div>
+
+                    {/* Row 3: probability + confidence */}
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-xs text-zinc-400">
+                        <span className="font-semibold">{Math.round(t.pStarter)}%</span>
+                        <span className="text-zinc-600 ml-0.5">starter</span>
+                      </span>
+                      <span className="text-zinc-600 text-xs">·</span>
+                      <span className="text-xs text-zinc-400">
+                        <span className="font-semibold">{Math.round(t.pElite)}%</span>
+                        <span className="text-zinc-600 ml-0.5">elite</span>
+                      </span>
+                      <ConfidenceDot confidence={t.confidence} />
+                    </div>
+
+                    {/* Reason text */}
+                    {t.reason && (
+                      <div className="text-xs text-zinc-500 mt-0.5 leading-snug">{t.reason}</div>
                     )}
+
+                    {/* Impact summary */}
+                    {t.impactSummary && (
+                      <div className="text-xs text-zinc-500 mt-0.5 leading-snug">{t.impactSummary}</div>
+                    )}
+
+                    {/* Comp pills */}
+                    <CompPills comps={t.comps} isArchetype={t.isArchetype} />
                   </div>
-
-                  {/* Row 3: probability + confidence */}
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span className="text-xs text-zinc-400">
-                      <span className="font-semibold">{Math.round(t.pStarter)}%</span>
-                      <span className="text-zinc-600 ml-0.5">starter</span>
-                    </span>
-                    <span className="text-zinc-700 text-xs">·</span>
-                    <span className="text-xs text-zinc-400">
-                      <span className="font-semibold">{Math.round(t.pElite)}%</span>
-                      <span className="text-zinc-600 ml-0.5">elite</span>
-                    </span>
-                    <ConfidenceDot confidence={t.confidence} />
-                  </div>
-
-                  {/* Reason text */}
-                  {t.reason && (
-                    <div className="text-xs text-zinc-500 mt-0.5 leading-snug">{t.reason}</div>
-                  )}
-
-                  {/* Impact summary */}
-                  {t.impactSummary && (
-                    <div className="text-xs text-zinc-500 mt-0.5 leading-snug">{t.impactSummary}</div>
-                  )}
-
-                  {/* Comp pills */}
-                  <CompPills comps={t.comps} isArchetype={t.isArchetype} />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-5 pt-4 border-t border-card-border/50">
+              <button
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft size={14} />
+                Previous
+              </button>
+              <span className="text-xs text-zinc-500">
+                {page + 1} / {totalPages} · {targets.length} prospects
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page === totalPages - 1}
+                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         !draftBoardError && !anyLoading && (
