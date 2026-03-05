@@ -72,24 +72,29 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
         <div className="bg-card-bg border border-card-border rounded-2xl p-5">
           <div className="text-sm font-semibold text-white mb-1">Rookie Draft Targets</div>
           <div className="text-xs text-gray-500 mb-4">
-            Top incoming prospects at your weakest positions, ranked by dynasty value
+            Highest-value prospects at your weakest positions — prioritized for your roster
           </div>
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {rookieDraftTargets.map((t, i) => (
-              <div key={i} className="flex items-start gap-2">
+              <div key={i} className="flex items-start gap-2.5">
+                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-card-border flex items-center justify-center mt-0.5">
+                  <span className="text-[10px] font-semibold text-gray-400">{i + 1}</span>
+                </div>
                 <PosBadge pos={t.position} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-200 truncate flex-1">{t.name}</span>
-                    <span className="text-xs text-gray-500 shrink-0">#{t.positionRank} {t.position}</span>
-                    <span className="text-xs font-medium text-yellow-400 tabular-nums shrink-0">
+                    <span className="text-xs text-gray-500 shrink-0">
+                      #{t.overallRank} ovr · #{t.positionRank} {t.position}
+                    </span>
+                    <span className="text-xs font-semibold text-yellow-400 tabular-nums shrink-0">
                       {t.dynastyValue.toLocaleString()}
                     </span>
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">{t.reason}</div>
-                  <div className="flex items-center gap-3 mt-1.5">
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     <span className="text-xs text-brand-cyan/80">
-                      ~{t.estimatedPeakWAR.toFixed(1)} est. peak WAR
+                      ~{t.estimatedPeakWAR.toFixed(1)} peak WAR
                     </span>
                     <span className="text-xs text-gray-600">·</span>
                     <span className="text-xs text-gray-400">{t.impactSummary}</span>

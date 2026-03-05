@@ -8,10 +8,21 @@ import { ShareButton } from '@/components/ShareButton';
 
 type DraftPageTab = 'analysis' | 'rookies';
 
+function getRookieSeasonDefaults() {
+  const now = new Date();
+  const month = now.getMonth(); // 0-indexed
+  const isRookieSeason = month >= 2 && month <= 5; // March–June
+  const nflDraftDate = new Date(`${now.getFullYear()}-04-23`);
+  const daysUntilDraft = Math.ceil((nflDraftDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const showCountdown = daysUntilDraft > 0 && daysUntilDraft <= 90;
+  return { isRookieSeason, daysUntilDraft, showCountdown };
+}
+
 export default function DraftPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<DraftPageTab>('analysis');
+  const { isRookieSeason, daysUntilDraft, showCountdown } = getRookieSeasonDefaults();
+  const [activeTab, setActiveTab] = useState<DraftPageTab>(isRookieSeason ? 'rookies' : 'analysis');
 
   return (
     <div>
@@ -24,6 +35,16 @@ export default function DraftPage() {
         </div>
         <ShareButton className="mt-1" />
       </div>
+
+      {showCountdown && (
+        <div className="mb-5 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2.5 flex items-center gap-3">
+          <span className="text-base">🏈</span>
+          <span className="text-sm text-amber-300">
+            <span className="font-semibold">NFL Draft in {daysUntilDraft} days</span>
+            <span className="text-amber-400/60 ml-2">— check your rookie targets below</span>
+          </span>
+        </div>
+      )}
 
       <div className="flex border-b border-card-border mb-6">
         <button
