@@ -75,6 +75,43 @@ export default function OverviewPage() {
         <ChevronRight size={16} className="text-muted-foreground group-hover:text-brand-cyan transition-colors flex-shrink-0" />
       </Link>
 
+      {/* Rookie Draft Season promo (March–June) */}
+      {(() => {
+        const now = new Date();
+        const month = now.getMonth(); // 0-indexed
+        const isRookieSeason = month >= 2 && month <= 5;
+        if (!isRookieSeason) return null;
+        const nflDraftDate = new Date(`${now.getFullYear()}-04-23`);
+        const daysUntilDraft = Math.ceil((nflDraftDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        const showCountdown = daysUntilDraft > 0 && daysUntilDraft <= 90;
+        return (
+          <Link
+            href={`/league/${leagueId}/draft`}
+            className="flex items-center gap-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 hover:border-amber-400/40 transition-colors group"
+          >
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-lg">
+              🏈
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold text-white group-hover:text-amber-300 transition-colors">
+                  Rookie Draft Targets
+                </span>
+                {showCountdown && (
+                  <span className="text-xs text-amber-400/80 bg-amber-400/10 px-2 py-0.5 rounded-full">
+                    NFL Draft in {daysUntilDraft}d
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                See which incoming rookies fill your roster&apos;s biggest position needs.
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-muted-foreground group-hover:text-amber-300 transition-colors flex-shrink-0" />
+          </Link>
+        );
+      })()}
+
       {/* Standings & Stats */}
       <div>
         <div className="flex items-center gap-2 mb-3">
