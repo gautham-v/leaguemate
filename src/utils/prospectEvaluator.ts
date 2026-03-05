@@ -1,16 +1,75 @@
 import type { HistoricalRookie } from '@/lib/supabase';
 
-// ── Outcome tier thresholds ───────────────────────────────────────────────────
-// PPR point totals per season that define each tier
+// ── Outcome tier thresholds (calibrated against historical_rookies DB, 2015-2024) ──
+// These PPR-per-season values define dynasty-relevant tiers.
+// Old WR thresholds (250/150) were too high — p90 of R1 WRs is only ~234pts.
+// Recalibrated so R1 WR shows realistic 14% elite, 49% starter rates.
 export const OUTCOME_TIERS: Record<string, { elite: number; starter: number; rotational: number }> = {
-  QB: { elite: 350, starter: 225, rotational: 100 },
-  RB: { elite: 200, starter: 125, rotational: 60 },
-  WR: { elite: 250, starter: 150, rotational: 75 },
-  TE: { elite: 150, starter: 80, rotational: 30 },
+  QB: { elite: 380, starter: 260, rotational: 130 }, // top-5 QB / QB1 / streamable
+  RB: { elite: 175, starter: 110, rotational: 55  }, // top-8 RB / RB2 / handcuff
+  WR: { elite: 225, starter: 130, rotational: 65  }, // top-12 WR / WR2 / flex
+  TE: { elite: 150, starter:  90, rotational: 40  }, // top-5 TE / TE1 / streamer
 };
 
-// Max position rank used to normalize distance — top 24 positional prospects are meaningful
+// ── Base rate priors for Bayesian shrinkage ───────────────────────────────────
+// Empirically derived from historical_rookies (2015-2024, Year 2 PPR).
+// Used to shrink comp-pool probabilities toward reality when the comp pool is small.
+// Formula: P_adjusted = (N/(N+K)) * P_comps + (K/(N+K)) * P_prior   (K=20)
+export const BASE_RATES: Record<string, Record<number, { pElite: number; pStarter: number }>> = {
+  WR: {
+    1: { pElite: 0.140, pStarter: 0.488 },
+    2: { pElite: 0.064, pStarter: 0.340 },
+    3: { pElite: 0.020, pStarter: 0.216 }, // 0% observed; floor at 2% (n=28, limited)
+    4: { pElite: 0.043, pStarter: 0.174 },
+    5: { pElite: 0.030, pStarter: 0.150 },
+    6: { pElite: 0.010, pStarter: 0.050 },
+    7: { pElite: 0.010, pStarter: 0.040 },
+  },
+  RB: {
+    1: { pElite: 0.643, pStarter: 0.786 },
+    2: { pElite: 0.375, pStarter: 0.500 },
+    3: { pElite: 0.296, pStarter: 0.430 }, // raw DB shows 55.6% — smoothed down (N=25, noisy)
+    4: { pElite: 0.063, pStarter: 0.188 },
+    5: { pElite: 0.060, pStarter: 0.180 },
+    6: { pElite: 0.020, pStarter: 0.095 },
+    7: { pElite: 0.020, pStarter: 0.080 },
+  },
+  TE: {
+    1: { pElite: 0.200, pStarter: 0.600 },
+    2: { pElite: 0.118, pStarter: 0.412 },
+    3: { pElite: 0.095, pStarter: 0.143 },
+    4: { pElite: 0.037, pStarter: 0.222 },
+    5: { pElite: 0.030, pStarter: 0.063 },
+    6: { pElite: 0.010, pStarter: 0.050 },
+    7: { pElite: 0.010, pStarter: 0.040 },
+  },
+  QB: {
+    1: { pElite: 0.057, pStarter: 0.371 },
+    2: { pElite: 0.010, pStarter: 0.200 },
+    3: { pElite: 0.010, pStarter: 0.050 },
+    4: { pElite: 0.010, pStarter: 0.040 },
+    5: { pElite: 0.010, pStarter: 0.030 },
+    6: { pElite: 0.010, pStarter: 0.020 },
+    7: { pElite: 0.010, pStarter: 0.020 },
+  },
+};
+
+// Bayesian shrinkage strength: K=20 means we need N≥20 comps before comp pool
+// contributes more than the prior. Below N=10, prior dominates (correct behavior).
+const SHRINKAGE_K = 20;
+
+/** Get base rate prior for a position+round, defaulting to round 4+ rates */
+function getBaseRate(position: string, draftRound: number | undefined): { pElite: number; pStarter: number } {
+  const posRates = BASE_RATES[position];
+  if (!posRates) return { pElite: 0.02, pStarter: 0.10 };
+  const round = Math.min(7, Math.max(1, draftRound ?? 4));
+  return posRates[round] ?? posRates[4] ?? { pElite: 0.02, pStarter: 0.10 };
+}
+
+// Max position rank for normalizing distance
 const MAX_POS_RANK = 24;
+// Max breakout age delta for normalizing (typical range ≈ 20-25 years)
+const MAX_BREAKOUT_AGE_DELTA = 5;
 
 // ── Output types ──────────────────────────────────────────────────────────────
 
@@ -26,15 +85,15 @@ export interface CompPlayer {
 }
 
 export interface OutcomeDistribution {
-  elite: number;       // percentage 0–100
+  elite: number;       // percentage 0–100 (Bayesian-shrunk toward base rate)
   starter: number;
   rotational: number;
   bust: number;
-  sampleSize: number;  // how many comps had data for this year
+  sampleSize: number;
 }
 
 export interface CompResults {
-  comps: CompPlayer[];         // top 5 closest (for display)
+  comps: CompPlayer[];
   distributions: {
     year1: OutcomeDistribution | null;
     year2: OutcomeDistribution | null;
@@ -42,7 +101,7 @@ export interface CompResults {
   };
   medianPPR: { year1: number | null; year2: number | null; year3: number | null };
   confidence: 'high' | 'medium' | 'low';
-  poolSize: number;            // total comps found
+  poolSize: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -50,35 +109,62 @@ export interface CompResults {
 /**
  * Compute normalized distance between a prospect and a historical rookie.
  *
- * Priority order:
- * 1. Position rank within class (positionRank vs pos_rank_in_class) — best signal
- *    because it matches e.g. "WR#3 in class" to historical WR3s regardless of overall pick.
- * 2. Overall pick number — fallback when pos_rank_in_class is unavailable
- * 3. Draft round — coarse fallback
- * 4. 1.0 (no match data)
+ * Priority / weighting:
+ * 1. Position rank within class  (primary: WR#3 in class → historical WR#3s)
+ * 2. Overall pick number         (log-transformed: early picks more differentiated)
+ * 3. Breakout age                (secondary: age-at-draft proxy for development stage)
+ * 4. Draft round                 (coarse fallback)
+ *
+ * Pick distance is LOG-TRANSFORMED so picks 1-10 are far more differentiated
+ * from each other than picks 100-110, matching real draft capital value curves.
  */
 function computeDistance(
-  prospect: { draftRound?: number; draftPick?: number; positionRank?: number },
+  prospect: {
+    draftRound?: number;
+    draftPick?: number;
+    positionRank?: number;
+    breakoutAge?: number;
+  },
   historical: HistoricalRookie,
 ): number {
   const hasPosRank = prospect.positionRank != null && historical.pos_rank_in_class != null;
-  const hasPick = prospect.draftPick != null && historical.draft_pick != null;
+  const hasPick    = prospect.draftPick != null && historical.draft_pick != null;
+  const hasAge     = prospect.breakoutAge != null && historical.breakout_age != null;
 
+  // Log-transformed pick distance: |ln(p+1) - ln(q+1)| / ln(263)
+  // This compresses the tail (late picks) relative to early picks.
+  const logPickDist = hasPick
+    ? Math.abs(Math.log(prospect.draftPick! + 1) - Math.log(historical.draft_pick! + 1))
+      / Math.log(263)
+    : null;
+
+  const posRankDist = hasPosRank
+    ? Math.min(1, Math.abs(prospect.positionRank! - historical.pos_rank_in_class!) / MAX_POS_RANK)
+    : null;
+
+  const ageDist = hasAge
+    ? Math.min(1, Math.abs(prospect.breakoutAge! - historical.breakout_age!) / MAX_BREAKOUT_AGE_DELTA)
+    : null;
+
+  // Combine available signals with appropriate weights
+  if (hasPosRank && hasPick && hasAge) {
+    return posRankDist! * 0.55 + logPickDist! * 0.30 + ageDist! * 0.15;
+  }
   if (hasPosRank && hasPick) {
-    // Both signals available: weight position rank higher (primary signal)
-    const posRankDist = Math.min(1, Math.abs(prospect.positionRank! - historical.pos_rank_in_class!) / MAX_POS_RANK);
-    const pickDist = Math.abs(prospect.draftPick! - historical.draft_pick!) / 262;
-    return posRankDist * 0.65 + pickDist * 0.35;
+    return posRankDist! * 0.65 + logPickDist! * 0.35;
   }
-
+  if (hasPosRank && hasAge) {
+    return posRankDist! * 0.70 + ageDist! * 0.30;
+  }
   if (hasPosRank) {
-    return Math.min(1, Math.abs(prospect.positionRank! - historical.pos_rank_in_class!) / MAX_POS_RANK);
+    return posRankDist!;
   }
-
+  if (hasPick && hasAge) {
+    return logPickDist! * 0.70 + ageDist! * 0.30;
+  }
   if (hasPick) {
-    return Math.abs(prospect.draftPick! - historical.draft_pick!) / 262;
+    return logPickDist!;
   }
-
   if (prospect.draftRound != null && historical.draft_round != null) {
     return Math.abs(prospect.draftRound - historical.draft_round) / 7;
   }
@@ -97,16 +183,13 @@ function median(values: number[]): number | null {
 
 /**
  * Compute similarity-weighted outcome distribution.
- *
- * Closer comps (higher similarity = lower distance) contribute more to the
- * probability estimate than distant comps. This avoids flattening the signal
- * when the pool includes borderline matches.
+ * Closer comps (higher similarity) contribute more to probabilities.
  */
 function computeWeightedDistribution(
   pool: Array<{ player: HistoricalRookie; weight: number }>,
   yearKey: 'year1_ppr' | 'year2_ppr' | 'year3_ppr',
   tiers: { elite: number; starter: number; rotational: number },
-): OutcomeDistribution | null {
+): { elite: number; starter: number; rotational: number; bust: number; sampleSize: number } | null {
   const pairs = pool
     .map(({ player, weight }) => ({ value: player[yearKey], weight }))
     .filter(({ value }) => value != null) as Array<{ value: number; weight: number }>;
@@ -121,20 +204,62 @@ function computeWeightedDistribution(
 
   for (const { value, weight } of pairs) {
     totalWeight += weight;
-    if (value >= tiers.elite) weightedElite += weight;
-    else if (value >= tiers.starter) weightedStarter += weight;
+    if (value >= tiers.elite)      weightedElite += weight;
+    else if (value >= tiers.starter)    weightedStarter += weight;
     else if (value >= tiers.rotational) weightedRotational += weight;
-    else weightedBust += weight;
+    else                                weightedBust += weight;
   }
 
   if (totalWeight === 0) return null;
 
   return {
-    elite: (weightedElite / totalWeight) * 100,
-    starter: (weightedStarter / totalWeight) * 100,
+    elite:      (weightedElite / totalWeight) * 100,
+    starter:    (weightedStarter / totalWeight) * 100,
     rotational: (weightedRotational / totalWeight) * 100,
-    bust: (weightedBust / totalWeight) * 100,
+    bust:       (weightedBust / totalWeight) * 100,
     sampleSize: pairs.length,
+  };
+}
+
+/**
+ * Apply Bayesian shrinkage to comp-pool probabilities.
+ *
+ * When the comp pool is small (N < 20), the raw comp percentages are unreliable.
+ * We shrink toward empirically-derived base rates for the position + draft round.
+ *
+ * shrinkageWeight = N / (N + K)
+ * - At N=5:  comp contributes 20%, prior 80%
+ * - At N=10: comp contributes 33%, prior 67%
+ * - At N=20: comp contributes 50%, prior 50%
+ * - At N=40: comp contributes 67%, prior 33%
+ */
+function applyBayesianShrinkage(
+  raw: { elite: number; starter: number; rotational: number; bust: number; sampleSize: number },
+  position: string,
+  estimatedRound: number | undefined,
+): OutcomeDistribution {
+  const prior = getBaseRate(position, estimatedRound);
+  const n = raw.sampleSize;
+  const w = n / (n + SHRINKAGE_K); // shrinkage weight toward comp pool
+
+  const shrunkElite   = w * (raw.elite / 100)   + (1 - w) * prior.pElite;
+  const shrunkStarter = w * (raw.starter / 100)  + (1 - w) * prior.pStarter;
+
+  // Rotational and bust: derive from remaining probability mass after elite+starter
+  const remaining = Math.max(0, 1 - shrunkElite - shrunkStarter);
+  // Maintain the raw elite/starter ratio for the remaining tiers
+  const rawBustRatio = raw.sampleSize > 0
+    ? (raw.bust / 100) / Math.max(0.01, (raw.rotational + raw.bust) / 100)
+    : 0.6; // default bust ratio when no data
+  const shrunkBust       = remaining * rawBustRatio;
+  const shrunkRotational = remaining * (1 - rawBustRatio);
+
+  return {
+    elite:      Math.min(100, shrunkElite * 100),
+    starter:    Math.min(100, shrunkStarter * 100),
+    rotational: Math.min(100, shrunkRotational * 100),
+    bust:       Math.min(100, shrunkBust * 100),
+    sampleSize: n,
   };
 }
 
@@ -147,30 +272,32 @@ export function evaluateProspect(
     draftPick?: number;
     /**
      * Position rank within the draft class (e.g. 3 = 3rd-best WR in this class).
-     * For 2026 pre-draft prospects this comes from FantasyCalc position_rank.
-     * For archetypes this is set to the draft round number (1, 2, 3).
+     * Primary comp matching dimension.
      */
     positionRank?: number;
+    /**
+     * Age at draft (breakout age proxy). When available, improves comp matching
+     * by distinguishing young-entry vs older-entry players at the same draft slot.
+     * Currently null for 2026 pre-draft prospects — will improve post-Combine.
+     */
+    breakoutAge?: number;
   },
   historicalPool: HistoricalRookie[],
   options?: { topN?: number },
 ): CompResults {
   const topN = options?.topN ?? 20;
 
-  // 1. Filter to same position (pool is pre-filtered by caller but guard anyway)
-  const positionPool = historicalPool.filter(
-    (p) => p.position === prospect.position,
-  );
+  // 1. Filter to same position
+  const positionPool = historicalPool.filter((p) => p.position === prospect.position);
 
   // 2. Compute distances and sort
   const withDistances = positionPool.map((p) => ({
     player: p,
     distance: computeDistance(prospect, p),
   }));
-
   withDistances.sort((a, b) => a.distance - b.distance);
 
-  // 3. Take top N comps; filter out distance=1.0 (no match data) when better comps exist
+  // 3. Take top N; filter out distance=1.0 (no match data) when better comps exist
   const hasGoodComps = withDistances.some(({ distance }) => distance < 1.0);
   const topComps = hasGoodComps
     ? withDistances.filter(({ distance }) => distance < 1.0).slice(0, topN)
@@ -178,14 +305,14 @@ export function evaluateProspect(
 
   const poolSize = topComps.length;
 
-  // 4. Confidence based on number of close comps (distance < 0.3)
+  // 4. Confidence: based on number of close comps (distance < 0.3)
   const closeComps = topComps.filter(({ distance }) => distance < 0.3).length;
   let confidence: 'high' | 'medium' | 'low';
   if (closeComps >= 10) confidence = 'high';
   else if (closeComps >= 5) confidence = 'medium';
   else confidence = 'low';
 
-  // 5. Top 5 for display
+  // 5. Top 5 for display (exclude distance=1.0 no-match entries)
   const top5 = withDistances
     .filter(({ distance }) => distance < 1.0)
     .slice(0, 5)
@@ -204,16 +331,22 @@ export function evaluateProspect(
   const tiers = OUTCOME_TIERS[prospect.position] ?? { elite: 999, starter: 999, rotational: 999 };
 
   // 7. Similarity-weighted distributions
-  // Use similarity (1 - distance) as weight so closer comps drive probabilities
   const weightedPool = topComps.map(({ player, distance }) => ({
     player,
-    weight: Math.max(0.1, 1 - distance), // floor weight at 0.1 to avoid zero-weight
+    weight: Math.max(0.1, 1 - distance),
   }));
 
+  // Compute raw (comp-pool only) distributions first
+  const rawDist1 = computeWeightedDistribution(weightedPool, 'year1_ppr', tiers);
+  const rawDist2 = computeWeightedDistribution(weightedPool, 'year2_ppr', tiers);
+  const rawDist3 = computeWeightedDistribution(weightedPool, 'year3_ppr', tiers);
+
+  // Apply Bayesian shrinkage toward position+round base rates
+  const estimatedRound = prospect.draftRound;
   const distributions = {
-    year1: computeWeightedDistribution(weightedPool, 'year1_ppr', tiers),
-    year2: computeWeightedDistribution(weightedPool, 'year2_ppr', tiers),
-    year3: computeWeightedDistribution(weightedPool, 'year3_ppr', tiers),
+    year1: rawDist1 ? applyBayesianShrinkage(rawDist1, prospect.position, estimatedRound) : null,
+    year2: rawDist2 ? applyBayesianShrinkage(rawDist2, prospect.position, estimatedRound) : null,
+    year3: rawDist3 ? applyBayesianShrinkage(rawDist3, prospect.position, estimatedRound) : null,
   };
 
   // 8. Median PPR
@@ -221,16 +354,14 @@ export function evaluateProspect(
   const year2Values = topComps.map((c) => c.player.year2_ppr).filter((v): v is number => v != null);
   const year3Values = topComps.map((c) => c.player.year3_ppr).filter((v): v is number => v != null);
 
-  const medianPPR = {
-    year1: median(year1Values),
-    year2: median(year2Values),
-    year3: median(year3Values),
-  };
-
   return {
     comps: top5,
     distributions,
-    medianPPR,
+    medianPPR: {
+      year1: median(year1Values),
+      year2: median(year2Values),
+      year3: median(year3Values),
+    },
     confidence,
     poolSize,
   };

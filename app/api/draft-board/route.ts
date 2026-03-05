@@ -204,6 +204,8 @@ export async function POST(req: NextRequest) {
             draftRound: estimatedRound,
             draftPick: estimatedPick,
             positionRank: classPosRank, // primary comp dimension: "WR#3 in class"
+            // breakoutAge: will be populated post-Combine (late March 2026)
+            // when we collect draft ages for prospect_profiles
           },
           posPool,
         );
