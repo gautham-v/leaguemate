@@ -30,7 +30,7 @@ function SimulatorContent({ userId, data }: SimulatorContentProps) {
 
 export default function TradesPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
-  const [activeTab, setActiveTab] = useState<TradesPageTab>('trades');
+  const [activeTab, setActiveTab] = useState<TradesPageTab>('strategy');
 
   const sessionUser = useSessionUser();
   const { computed } = useDashboardData(leagueId);
@@ -56,8 +56,8 @@ export default function TradesPage() {
   }, [computed]);
 
   const TAB_LABELS: { id: TradesPageTab; label: string }[] = [
-    { id: 'trades', label: 'Trade History' },
     { id: 'strategy', label: 'Trade Strategy' },
+    { id: 'trades', label: 'Trade History' },
     { id: 'simulator', label: 'Simulator' },
   ];
 
