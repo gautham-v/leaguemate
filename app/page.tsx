@@ -113,13 +113,10 @@ export default function HomePage() {
 
       {/* Hero */}
       <div className="text-center space-y-3 max-w-lg">
-        <span className="text-5xl leading-none">🏈</span>
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">
-            <span className="text-white">leaguemate</span><span className="text-muted-foreground">.fyi</span>
-          </h1>
-        </div>
-        <p className="text-sm text-muted-foreground pt-1">
+        <h1 className="text-2xl font-bold tracking-tight">
+          <span className="text-white">leaguemate</span><span className="text-muted-foreground">.fyi</span>
+        </h1>
+        <p className="text-sm text-muted-foreground">
           Dynasty strategy, built around your roster.
         </p>
       </div>
