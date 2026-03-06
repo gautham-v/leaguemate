@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useDashboardData } from '@/hooks/useLeagueData';
 import { useSessionUser } from '@/hooks/useSessionUser';
+import { useFranchiseOutlook } from '@/hooks/useFranchiseOutlook';
 import { Overview } from '@/components/Overview';
 import { LeagueTables } from '@/components/LeagueTables';
 import { ShareButton } from '@/components/ShareButton';
@@ -15,6 +16,9 @@ export default function OverviewPage() {
   const router = useRouter();
   const sessionUser = useSessionUser();
   const { computed, isLoading, league } = useDashboardData(leagueId);
+  // Warm the franchise outlook cache while the user reads the overview,
+  // so Franchise/Trades/Manager tabs load instantly when navigated to.
+  useFranchiseOutlook(leagueId);
   const handleSelectManager = (uid: string) => {
     router.push(`/league/${leagueId}/managers/${uid}`);
   };
