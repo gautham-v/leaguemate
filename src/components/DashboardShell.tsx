@@ -16,6 +16,7 @@ import {
   Scale,
   ClipboardList,
   FlaskConical,
+  Lock,
 } from 'lucide-react';
 import { AboutModal } from '@/components/AboutModal';
 import { ContactModal } from '@/components/ContactModal';
@@ -25,6 +26,10 @@ import { SidebarNav, type SidebarNavProps } from '@/components/SidebarNav';
 import { TABS, type TabId } from '@/lib/tabs';
 import { avatarUrl } from '@/utils/calculations';
 import { useSessionUser, clearSessionUser } from '@/hooks/useSessionUser';
+import { useSubscription } from '@/hooks/useSubscription';
+import { useAuthContext } from '@/context/auth';
+import { UpgradeModal } from '@/components/UpgradeModal';
+import { createClient } from '@/lib/supabase-browser';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const params = useParams<{ leagueId: string; userId?: string }>();
@@ -46,6 +51,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   // User context from sessionStorage
   const sessionUser = useSessionUser();
+
+  const { isPro } = useSubscription();
+  const { user: supabaseUser } = useAuthContext();
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const [leagueSheetOpen, setLeagueSheetOpen] = useState(false);
   const [leaguePickerOpen, setLeaguePickerOpen] = useState(false);
@@ -75,6 +84,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   };
 
   const handleChangeLeague = (id: string) => {
+    if (!isPro) {
+      setShowUpgradeModal(true);
+      return;
+    }
     posthog.capture('league_switched', { from_league_id: leagueId, to_league_id: id });
     router.push(`/league/${id}/overview`);
   };
@@ -93,9 +106,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleChangeUser = () => {
+  const handleChangeUser = async () => {
     queryClient.clear();
     clearSessionUser();
+    if (supabaseUser) {
+      await createClient().auth.signOut();
+    }
     router.push('/');
   };
 
@@ -107,6 +123,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const isMyProfileRoute = showingManagerProfile && !!userId && params.userId === userId && !pathname.endsWith('/career-stats');
 
+  const totalLeagueCount = allLeagueGroups.length;
+
   const sidebarProps: SidebarNavProps = {
     league,
     leagueId,
@@ -114,7 +132,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     allLeagueGroups,
     isOffseason,
     currentWeek,
+    isPro,
     onChangeLeague: handleChangeLeague,
+    onLockedLeague: () => setShowUpgradeModal(true),
     onTabChange: handleTabChange,
     onCareerStats: sessionUser ? handleCareerStats : undefined,
     careerStatsActive: isCareerRoute,
@@ -379,6 +399,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </SheetContent>
       </Sheet>
 
+      {/* Upgrade modal */}
+      {showUpgradeModal && (
+        <UpgradeModal
+          leagueCount={totalLeagueCount}
+          onClose={() => setShowUpgradeModal(false)}
+        />
+      )}
+
       {/* Mobile League Picker Sheet */}
       <Sheet open={leaguePickerOpen} onOpenChange={setLeaguePickerOpen}>
         <SheetContent
@@ -427,25 +455,31 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     .filter(([, group]) => !group.some((g) => g.league_id === leagueId))
                     .map(([name, group]) => {
                       const latest = [...group].sort((a, b) => Number(b.season) - Number(a.season))[0];
+                      const locked = !isPro;
                       return (
                         <button
                           key={latest.league_id}
-                          onClick={() => { handleChangeLeague(latest.league_id); setLeaguePickerOpen(false); }}
-                          className="flex-shrink-0 flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-left transition-colors bg-card-bg border border-card-border text-gray-300 hover:border-gray-500 hover:text-white min-w-0"
+                          onClick={() => { handleChangeLeague(latest.league_id); if (isPro) setLeaguePickerOpen(false); }}
+                          className={`flex-shrink-0 flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-left transition-colors bg-card-bg border min-w-0 ${
+                            locked
+                              ? 'border-card-border text-gray-500 opacity-70'
+                              : 'border-card-border text-gray-300 hover:border-gray-500 hover:text-white'
+                          }`}
                           style={{ maxWidth: '180px' }}
                         >
                           {latest.avatar ? (
                             <img
                               src={avatarUrl(latest.avatar) ?? ''}
                               alt={name}
-                              className="w-6 h-6 rounded-lg object-cover flex-shrink-0"
+                              className={`w-6 h-6 rounded-lg object-cover flex-shrink-0 ${locked ? 'opacity-40' : ''}`}
                             />
                           ) : (
-                            <div className="w-6 h-6 rounded-lg bg-brand-purple/20 flex items-center justify-center text-brand-purple text-xs font-bold flex-shrink-0 border border-brand-purple/20">
+                            <div className={`w-6 h-6 rounded-lg bg-brand-purple/20 flex items-center justify-center text-brand-purple text-xs font-bold flex-shrink-0 border border-brand-purple/20 ${locked ? 'opacity-40' : ''}`}>
                               {name.slice(0, 2)}
                             </div>
                           )}
                           <span className="font-medium truncate">{name}</span>
+                          {locked && <Lock size={11} className="text-gray-600 flex-shrink-0 ml-auto" />}
                         </button>
                       );
                     })}

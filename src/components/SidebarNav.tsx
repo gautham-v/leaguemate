@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ChevronDown, BarChart2, UserCircle, FlaskConical } from 'lucide-react';
+import { ChevronDown, BarChart2, UserCircle, FlaskConical, Lock } from 'lucide-react';
 import { TABS, type TabId } from '@/lib/tabs';
 import { avatarUrl } from '@/utils/calculations';
 import type { SleeperLeague } from '@/types/sleeper';
@@ -15,7 +15,9 @@ export type SidebarNavProps = {
   allLeagueGroups: [string, SleeperLeague[]][];
   isOffseason: boolean;
   currentWeek: number;
+  isPro?: boolean;
   onChangeLeague: (id: string) => void;
+  onLockedLeague?: () => void;
   onTabChange: (tab: TabId) => void;
   onClose?: () => void;
   onCareerStats?: () => void;
@@ -27,7 +29,7 @@ export type SidebarNavProps = {
 
 export function SidebarNav({
   league, leagueId, activeTab, allLeagueGroups, isOffseason, currentWeek,
-  onChangeLeague, onTabChange, onClose,
+  isPro = false, onChangeLeague, onLockedLeague, onTabChange, onClose,
   onCareerStats, careerStatsActive = false,
   onViewMyProfile, myProfileActive = false,
 }: SidebarNavProps) {
@@ -89,10 +91,16 @@ export function SidebarNav({
               {allLeagueGroups.map(([name, group]) => {
                 const latest = [...group].sort((a, b) => Number(b.season) - Number(a.season))[0];
                 const isActive = group.some((g) => g.league_id === leagueId);
+                const locked = !isPro && !isActive;
                 return (
                   <button
                     key={latest.league_id}
                     onClick={() => {
+                      if (locked) {
+                        setLeagueDropdownOpen(false);
+                        onLockedLeague?.();
+                        return;
+                      }
                       onChangeLeague(latest.league_id);
                       setLeagueDropdownOpen(false);
                       onClose?.();
@@ -100,24 +108,37 @@ export function SidebarNav({
                     className={`w-full text-left px-3 py-2.5 text-xs transition-colors flex items-center gap-2.5 ${
                       isActive
                         ? 'bg-brand-cyan/20 text-brand-cyan font-medium'
-                        : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                        : locked
+                          ? 'text-gray-600 hover:bg-white/5'
+                          : 'text-gray-400 hover:bg-white/5 hover:text-white'
                     }`}
                   >
                     {latest.avatar ? (
                       <img
                         src={avatarUrl(latest.avatar) ?? ''}
                         alt={name}
-                        className="w-5 h-5 rounded-md object-cover flex-shrink-0"
+                        className={`w-5 h-5 rounded-md object-cover flex-shrink-0 ${locked ? 'opacity-40' : ''}`}
                       />
                     ) : (
-                      <div className="w-5 h-5 rounded-md bg-brand-purple/20 flex items-center justify-center text-brand-purple font-bold text-[10px] flex-shrink-0 border border-brand-purple/20">
+                      <div className={`w-5 h-5 rounded-md bg-brand-purple/20 flex items-center justify-center text-brand-purple font-bold text-[10px] flex-shrink-0 border border-brand-purple/20 ${locked ? 'opacity-40' : ''}`}>
                         {name.slice(0, 2)}
                       </div>
                     )}
-                    <span className="truncate">{name}</span>
+                    <span className="truncate flex-1">{name}</span>
+                    {locked && <Lock size={10} className="text-gray-600 flex-shrink-0" />}
                   </button>
                 );
               })}
+              {!isPro && allLeagueGroups.length > 1 && (
+                <div className="border-t border-card-border/40 mt-1 px-3 py-2">
+                  <button
+                    onClick={() => { setLeagueDropdownOpen(false); onLockedLeague?.(); }}
+                    className="text-[10px] text-brand-cyan hover:text-brand-cyan/80 transition-colors font-medium"
+                  >
+                    Unlock all leagues — Pro
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
