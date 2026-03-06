@@ -46,12 +46,13 @@ export default function TermsPage() {
 
         <SectionHeading>2. Description of Service</SectionHeading>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          leaguemate.fyi is a free, read-only fantasy football analytics tool. It retrieves publicly
+          leaguemate.fyi is a read-only fantasy football analytics tool. It retrieves publicly
           available data from the Sleeper API using your Sleeper username, and uses that data to
           generate personalized dynasty strategy analysis, player recommendations, draft projections,
-          and trade simulations. The Service does not require account creation, does not store your
-          personal information, and does not interact with your Sleeper account beyond reading
-          publicly available data.
+          and trade simulations. Core features are free. Optional account creation (via Google OAuth)
+          enables persistent league access. A paid Pro subscription ($19.99/year) unlocks multi-league
+          switching across sessions. The Service does not interact with your Sleeper account beyond
+          reading publicly available data.
         </p>
 
         <SectionHeading>3. No Affiliation with Sleeper</SectionHeading>
@@ -64,11 +65,14 @@ export default function TermsPage() {
 
         <SectionHeading>4. Data and Privacy</SectionHeading>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          leaguemate.fyi does not collect, store, or sell personal information. Your Sleeper
-          username is stored only in your browser&apos;s session storage and is never transmitted to our
-          servers. League and roster data is fetched directly from the Sleeper public API on demand.
-          We may collect anonymous, aggregated usage analytics (e.g. page views) via PostHog to
-          improve the Service.
+          If you use the Service anonymously, your Sleeper username is stored only in your
+          browser&apos;s session storage and is never transmitted to our servers. If you create an
+          account, we store your email address, Google account identifier, and linked Sleeper
+          account details (username, user ID, display name, avatar) in our database to provide
+          persistent access. Subscription status is stored to manage Pro plan access. We do not
+          sell personal information. League and roster data is fetched directly from the Sleeper
+          public API on demand and is not persisted on our servers. We may collect anonymous,
+          aggregated usage analytics (e.g. page views) via PostHog to improve the Service.
         </p>
 
         <SectionHeading>5. Accuracy Disclaimer</SectionHeading>

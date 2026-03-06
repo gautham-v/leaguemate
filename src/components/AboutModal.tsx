@@ -101,8 +101,10 @@ export function AboutModal({ children }: { children: React.ReactNode }) {
               leaguemate.fyi is a <span className="text-white font-semibold">personalized dynasty strategy engine</span>.
               It ingests your Sleeper roster and cross-references a database of{' '}
               <span className="text-white font-semibold">3,500+ historical rookies</span> to generate Hold, Trade, or
-              Cut verdicts tuned to your team&apos;s strategy &mdash; not the market at large. It&apos;s{' '}
-              <span className="text-white font-semibold">completely free</span> &mdash; no ads, no accounts, no paywalls.
+              Cut verdicts tuned to your team&apos;s strategy &mdash; not the market at large. Core analytics are{' '}
+              <span className="text-white font-semibold">free</span>. A{' '}
+              <span className="text-white font-semibold">Pro plan ($19.99/yr)</span> unlocks persistent login and
+              one-tap switching across all your leagues.
             </p>
           </section>
 

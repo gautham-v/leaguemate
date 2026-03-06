@@ -132,7 +132,7 @@ export default function HowItWorksPage() {
             to give you actionable verdicts, not raw numbers.
           </p>
           <p className="text-muted-foreground mt-3 text-sm font-medium">
-            No accounts. No paywalls. No black boxes.
+            Core analytics are free. No black boxes.
           </p>
         </div>
 
