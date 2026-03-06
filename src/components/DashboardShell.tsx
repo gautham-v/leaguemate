@@ -335,6 +335,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
             {supabaseUser ? (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowLookupModal(true)}
+                  className="text-sm text-gray-400 hover:text-gray-200 transition-colors flex items-center gap-1.5"
+                >
+                  <Search size={14} />
+                  Look up a user
+                </button>
               <div className="relative" ref={avatarMenuRef}>
                 <button
                   onClick={() => setAvatarMenuOpen((o) => !o)}
@@ -395,6 +403,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     )}
                   </div>
                 )}
+              </div>
               </div>
             ) : (
               <div className="flex items-center gap-3">
