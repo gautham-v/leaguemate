@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import posthog from 'posthog-js';
 import { Loader2, Brain, Target, TrendingUp } from 'lucide-react';
 import { AboutModal } from '@/components/AboutModal';
@@ -108,10 +108,14 @@ export default function HomePage() {
   const { user, loading: authLoading } = useAuthContext();
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // When ?lookup=true, skip auto-redirect so user can search a different username
+  const isLookupMode = searchParams.get('lookup') === 'true';
 
   // Effect: if user is authenticated and has a linked Sleeper account, auto-load leagues
+  // Skip this when in lookup mode (user wants to search a different username)
   useEffect(() => {
-    if (authLoading || !user) return;
+    if (authLoading || !user || isLookupMode) return;
 
     const supabase = createClient();
     supabase
@@ -140,7 +144,7 @@ export default function HomePage() {
         // if no sleeper_username, the link-account UI will be rendered below
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading]);
+  }, [user, authLoading, isLookupMode]);
 
   // Anonymous form submit
   const handleSubmit = async (e: React.FormEvent) => {
@@ -213,13 +217,16 @@ export default function HomePage() {
     }
   };
 
-  // Google OAuth
+  // Google OAuth — forces account picker so user can choose a different account
   const handleGoogleSignIn = async () => {
     setOauthLoading(true);
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: 'select_account' },
+      },
     });
     // Page will redirect; no need to reset oauthLoading
   };
@@ -238,8 +245,8 @@ export default function HomePage() {
       );
     }
 
-    // Authenticated user with a linked Sleeper account — auto-redirecting
-    if (user && loading) {
+    // Authenticated user with a linked Sleeper account — auto-redirecting (only when not in lookup mode)
+    if (user && loading && !isLookupMode) {
       return (
         <>
           <CardContent className="pt-6 pb-0 flex flex-col items-center gap-2">
@@ -252,8 +259,8 @@ export default function HomePage() {
       );
     }
 
-    // Authenticated user without a linked Sleeper account — show link form
-    if (user) {
+    // Authenticated user without a linked Sleeper account (and not in lookup mode) — show link form
+    if (user && !isLookupMode) {
       return (
         <>
           <CardContent className="pt-6 pb-0">
@@ -304,66 +311,74 @@ export default function HomePage() {
       );
     }
 
-    // Unauthenticated — show anonymous form + Google sign-in
+    // Unauthenticated — or lookup mode (search any username)
     return (
       <>
         <CardContent className="pt-6 pb-0">
-          {/* Google sign-in */}
-          <div className="mb-4">
-            <p className="text-xs text-muted-foreground text-center mb-3">
-              Sign in to save your leagues across sessions
+          {isLookupMode ? (
+            <p className="text-xs text-muted-foreground text-center mb-4">
+              Enter a Sleeper username to look up their leagues
             </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              className="w-full font-medium border-card-border bg-transparent hover:bg-white/5 text-white"
-              onClick={handleGoogleSignIn}
-              disabled={oauthLoading}
-            >
-              {oauthLoading ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  Redirecting&hellip;
-                </>
-              ) : (
-                <>
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    className="w-4 h-4 shrink-0"
-                  >
-                    <path
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      fill="#4285F4"
-                    />
-                    <path
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      fill="#34A853"
-                    />
-                    <path
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
-                      fill="#FBBC05"
-                    />
-                    <path
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                      fill="#EA4335"
-                    />
-                  </svg>
-                  Continue with Google
-                </>
-              )}
-            </Button>
-          </div>
+          ) : (
+            <>
+              {/* Google sign-in */}
+              <div className="mb-4">
+                <p className="text-xs text-muted-foreground text-center mb-3">
+                  Sign in to save your leagues across sessions
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  className="w-full font-medium border-card-border bg-transparent hover:bg-white/5 text-white"
+                  onClick={handleGoogleSignIn}
+                  disabled={oauthLoading}
+                >
+                  {oauthLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Redirecting&hellip;
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className="w-4 h-4 shrink-0"
+                      >
+                        <path
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                          fill="#4285F4"
+                        />
+                        <path
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                          fill="#34A853"
+                        />
+                        <path
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+                          fill="#FBBC05"
+                        />
+                        <path
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                          fill="#EA4335"
+                        />
+                      </svg>
+                      Continue with Google
+                    </>
+                  )}
+                </Button>
+              </div>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 h-px bg-card-border" />
-            <span className="text-xs text-muted-foreground">or</span>
-            <div className="flex-1 h-px bg-card-border" />
-          </div>
+              {/* Divider */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 h-px bg-card-border" />
+                <span className="text-xs text-muted-foreground">or</span>
+                <div className="flex-1 h-px bg-card-border" />
+              </div>
+            </>
+          )}
 
-          {/* Anonymous username form */}
+          {/* Username form — always shown */}
           <form id="username-form" onSubmit={handleSubmit}>
             <Field>
               <FieldLabel htmlFor="username">Sleeper Username</FieldLabel>
@@ -403,9 +418,11 @@ export default function HomePage() {
               'View My Dashboard'
             )}
           </Button>
-          <p className="text-xs text-muted-foreground text-center">
-            No account needed
-          </p>
+          {!isLookupMode && (
+            <p className="text-xs text-muted-foreground text-center">
+              No account needed
+            </p>
+          )}
         </CardFooter>
       </>
     );

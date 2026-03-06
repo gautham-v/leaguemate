@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
+  const next = requestUrl.searchParams.get('next') ?? '/';
   const origin = requestUrl.origin;
 
   if (code) {
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest) {
     await supabase.auth.exchangeCodeForSession(code);
   }
 
-  // Always redirect to home — the page handles the post-auth linking flow
-  return NextResponse.redirect(`${origin}/`);
+  // Redirect to `next` if provided (e.g. when signing in from within the dashboard)
+  // Otherwise fall back to home page which handles the post-auth linking flow
+  return NextResponse.redirect(`${origin}${next}`);
 }

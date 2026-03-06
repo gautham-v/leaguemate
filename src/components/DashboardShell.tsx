@@ -69,6 +69,29 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const allLeagueGroups = sessionUser?.leagueGroups ?? [];
 
+  // Auto-link Sleeper account when an anonymous session user signs in with Google.
+  // This runs silently in the background so the user stays on the current page.
+  useEffect(() => {
+    if (!supabaseUser || !sessionUser) return;
+    const supabase = createClient();
+    supabase
+      .from('user_profiles')
+      .select('sleeper_user_id')
+      .eq('id', supabaseUser.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.sleeper_user_id) return; // already linked
+        return supabase.from('user_profiles').upsert({
+          id: supabaseUser.id,
+          sleeper_user_id: sessionUser.userId,
+          sleeper_username: sessionUser.username,
+          sleeper_display_name: sessionUser.displayName,
+          sleeper_avatar: sessionUser.avatar,
+        });
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabaseUser?.id, sessionUser?.userId]);
+
   // Close avatar menu on outside click
   useEffect(() => {
     if (!avatarMenuOpen) return;
@@ -127,6 +150,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       await createClient().auth.signOut();
     }
     router.push('/');
+  };
+
+  // Sign in with Google from within the app — returns to current page after auth
+  // and auto-links the Sleeper account via the effect above
+  const handleSignInWithGoogle = () => {
+    void createClient().auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(pathname)}`,
+        queryParams: { prompt: 'select_account' },
+      },
+    });
   };
 
   const isCareerRoute = pathname.endsWith('/career') || pathname.endsWith('/career-stats');
@@ -279,7 +314,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       {supabaseUser ? 'Sign Out' : 'Switch User'}
                     </button>
                     <button
-                      onClick={() => { setAvatarMenuOpen(false); router.push('/'); }}
+                      onClick={() => { setAvatarMenuOpen(false); router.push('/?lookup=true'); }}
                       className="w-full text-left px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2.5"
                     >
                       <Search size={15} className="text-gray-500 flex-shrink-0" /> Look up another league
@@ -295,21 +330,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
               </div>
-            ) : sessionUser && !supabaseUser ? (
-              <button
-                onClick={() => {
-                  void createClient().auth.signInWithOAuth({
-                    provider: 'google',
-                    options: { redirectTo: `${window.location.origin}/auth/callback` },
-                  });
-                }}
-                className="text-sm font-medium text-brand-cyan border border-brand-cyan/40 hover:border-brand-cyan hover:bg-brand-cyan/10 rounded-lg px-4 py-2 transition-colors"
-              >
-                Sign in
-              </button>
             ) : (
               <button
-                onClick={() => router.push('/')}
+                onClick={handleSignInWithGoogle}
                 className="text-sm font-medium text-brand-cyan border border-brand-cyan/40 hover:border-brand-cyan hover:bg-brand-cyan/10 rounded-lg px-4 py-2 transition-colors"
               >
                 Sign in
@@ -590,7 +613,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     <div>
                       <div className="text-xs font-semibold text-amber-400">Pro — Active</div>
                       <div className="text-[10px] text-gray-500">
-                        {isPro && cancelAtPeriodEnd && periodEnd
+                        {cancelAtPeriodEnd && periodEnd
                           ? `Access until ${new Date(periodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
                           : 'Multi-league access'}
                       </div>
@@ -640,12 +663,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   <div className="bg-card-bg border border-card-border rounded-xl p-3 space-y-2">
                     <div className="text-xs text-gray-400">Sign in to save your leagues and unlock Pro</div>
                     <button
-                      onClick={() => {
-                        void createClient().auth.signInWithOAuth({
-                          provider: 'google',
-                          options: { redirectTo: `${window.location.origin}/auth/callback` },
-                        });
-                      }}
+                      onClick={() => { setUserMenuOpen(false); handleSignInWithGoogle(); }}
                       className="w-full text-sm font-medium text-brand-cyan border border-brand-cyan/40 hover:border-brand-cyan hover:bg-brand-cyan/10 rounded-lg px-4 py-2.5 transition-colors"
                     >
                       Continue with Google
@@ -664,7 +682,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
                 {/* Look up another league */}
                 <button
-                  onClick={() => { setUserMenuOpen(false); router.push('/'); }}
+                  onClick={() => { setUserMenuOpen(false); router.push('/?lookup=true'); }}
                   className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-400 hover:text-white bg-card-bg border border-card-border rounded-xl hover:border-gray-500 transition-colors"
                 >
                   <Search size={15} className="text-gray-500 flex-shrink-0" />

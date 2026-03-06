@@ -138,10 +138,7 @@ export function SidebarNav({
                   className="bg-brand-cyan/10 border-t border-card-border/40 px-3 py-2.5 flex items-center gap-2.5 w-full hover:bg-brand-cyan/15 transition-colors"
                 >
                   <Zap size={13} className="text-brand-cyan flex-shrink-0" />
-                  <div className="text-left">
-                    <div className="text-brand-cyan text-xs font-semibold">Upgrade to Pro</div>
-                    <div className="text-gray-500 text-[10px]">from $1.67/mo</div>
-                  </div>
+                  <div className="text-brand-cyan text-xs font-semibold">Upgrade to Pro</div>
                 </button>
               )}
             </div>

@@ -57,7 +57,10 @@ export function UpgradeModal({ leagueCount, onClose }: UpgradeModalProps) {
   const handleGoogleSignIn = async () => {
     await createClient().auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: 'select_account' },
+      },
     });
   };
 
@@ -147,9 +150,8 @@ export function UpgradeModal({ leagueCount, onClose }: UpgradeModalProps) {
               ))}
             </div>
 
-            {/* Pricing CTAs */}
+            {/* Pricing CTA */}
             <div className="px-5 pb-5 space-y-2.5">
-              {/* Annual — primary */}
               <Button
                 className="w-full font-bold"
                 size="lg"
