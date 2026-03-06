@@ -34,6 +34,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useAuthContext } from '@/context/auth';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { LookupLeagueModal } from '@/components/LookupLeagueModal';
+import { HeaderUserSearch } from '@/components/HeaderUserSearch';
 import { createClient } from '@/lib/supabase-browser';
 
 interface OwnProfile {
@@ -336,13 +337,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
             {supabaseUser ? (
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowLookupModal(true)}
-                  className="text-sm text-gray-400 hover:text-gray-200 transition-colors flex items-center gap-1.5"
-                >
-                  <Search size={14} />
-                  Look up a user
-                </button>
+                <HeaderUserSearch isPro={isPro} onUpgrade={() => setShowUpgradeModal(true)} />
               <div className="relative" ref={avatarMenuRef}>
                 <button
                   onClick={() => setAvatarMenuOpen((o) => !o)}
@@ -407,13 +402,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowLookupModal(true)}
-                  className="text-sm text-gray-400 hover:text-gray-200 transition-colors flex items-center gap-1.5"
-                >
-                  <Search size={14} />
-                  Look up a user
-                </button>
+                <HeaderUserSearch isPro={isPro} onUpgrade={() => setShowUpgradeModal(true)} />
                 <button
                   onClick={handleSignInWithGoogle}
                   className="text-sm font-medium text-brand-cyan border border-brand-cyan/40 hover:border-brand-cyan hover:bg-brand-cyan/10 rounded-lg px-4 py-2 transition-colors"
