@@ -9,7 +9,8 @@ import { useFranchiseOutlook } from '../hooks/useFranchiseOutlook';
 import { useAllTimeWAR } from '../hooks/useAllTimeWAR';
 import { useManagerRosterStats } from '../hooks/useManagerRosterStats';
 import { usePlayerRecommendations } from '../hooks/usePlayerRecommendations';
-import type { PlayerRecommendation } from '../types/recommendations';
+import { usePickRecommendations } from '../hooks/usePickRecommendations';
+import type { PlayerRecommendation, PickVerdict } from '../types/recommendations';
 import { calcAllTimeStats, calcH2H, calcAllTimeRecords } from '../utils/calculations';
 import { Avatar } from './Avatar';
 import { ShareButton } from './ShareButton';
@@ -63,6 +64,7 @@ export function ManagerProfile({ leagueId, userId, onBack, onSelectManager, onVi
   const trajectoryAnalysis = useAllTimeWAR(trajectoryUnlocked ? leagueId : null);
   const rosterStats = useManagerRosterStats(leagueId, userId);
   const recommendations = usePlayerRecommendations(franchiseUnlocked ? leagueId : null, userId);
+  const pickRecommendations = usePickRecommendations(franchiseUnlocked ? leagueId : null, userId);
   const PLAYERS_PER_PAGE = 10;
   const [playersPage, setPlayersPage] = useState(1);
   const [playersView, setPlayersView] = useState<'current' | 'all'>('current');
@@ -1035,6 +1037,71 @@ export function ManagerProfile({ leagueId, userId, onBack, onSelectManager, onVi
               <div className="text-sm font-medium text-gray-300">No player history available</div>
               <div className="text-xs text-gray-500 mt-1">
                 Player history requires completed matchup data for this league.
+              </div>
+            </div>
+          )}
+
+          {/* Draft Picks Section */}
+          {pickRecommendations.data && pickRecommendations.data.length > 0 && (
+            <div className="bg-card-bg border border-card-border rounded-2xl overflow-hidden">
+              <div className="px-5 pt-4 pb-3 flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-white text-sm">Draft Picks</span>
+                <span className="text-xs text-gray-500">— tap a pick for strategy guidance</span>
+                <div className="ml-auto flex items-center gap-2">
+                  {(['HOLD', 'TRADE', 'TRADE_UP', 'TRADE_DOWN'] as PickVerdict[]).map(v => {
+                    const count = pickRecommendations.data!.filter(r => r.verdict === v).length;
+                    if (count === 0) return null;
+                    const styles: Record<PickVerdict, string> = {
+                      HOLD:       'bg-emerald-900/40 text-emerald-400 border border-emerald-700/40',
+                      TRADE:      'bg-amber-900/40 text-amber-400 border border-amber-700/40',
+                      TRADE_UP:   'bg-brand-cyan/10 text-brand-cyan border border-brand-cyan/30',
+                      TRADE_DOWN: 'bg-purple-900/40 text-purple-400 border border-purple-700/40',
+                    };
+                    const labels: Record<PickVerdict, string> = {
+                      HOLD: 'Hold', TRADE: 'Trade', TRADE_UP: 'Trade Up', TRADE_DOWN: 'Trade Down',
+                    };
+                    return (
+                      <span key={v} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${styles[v]}`}>
+                        {count} {labels[v]}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="px-5 pb-4 space-y-2">
+                {[...pickRecommendations.data]
+                  .sort((a, b) => a.pick.round - b.pick.round || Number(a.pick.season) - Number(b.pick.season))
+                  .map((rec, i) => {
+                    const pickLabel = rec.pick.slot != null
+                      ? `${rec.pick.season} ${rec.pick.round}.${rec.pick.slot.toString().padStart(2, '0')}`
+                      : `${rec.pick.season} Rd ${rec.pick.round}`;
+                    const verdictStyles: Record<PickVerdict, string> = {
+                      HOLD:       'bg-emerald-900/40 text-emerald-400 border border-emerald-700/40',
+                      TRADE:      'bg-amber-900/40 text-amber-400 border border-amber-700/40',
+                      TRADE_UP:   'bg-brand-cyan/10 text-brand-cyan border border-brand-cyan/30',
+                      TRADE_DOWN: 'bg-purple-900/40 text-purple-400 border border-purple-700/40',
+                    };
+                    const verdictLabels: Record<PickVerdict, string> = {
+                      HOLD: 'HOLD', TRADE: 'TRADE', TRADE_UP: 'TRADE UP', TRADE_DOWN: 'TRADE DOWN',
+                    };
+                    return (
+                      <div
+                        key={i}
+                        className="flex flex-col gap-1.5 bg-gray-800/40 border border-gray-700/30 rounded-xl px-4 py-3"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <PosBadge pos="PICK" />
+                          <span className="text-sm font-medium text-gray-200 flex-1">{pickLabel}</span>
+                          <span className="text-xs text-gray-500 tabular-nums shrink-0">{rec.contextualWAR.toFixed(1)} cWAR</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${verdictStyles[rec.verdict]}`}>
+                            {verdictLabels[rec.verdict]}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-400 leading-relaxed">{rec.reason}</div>
+                      </div>
+                    );
+                  })
+                }
               </div>
             </div>
           )}
