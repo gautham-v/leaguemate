@@ -136,18 +136,13 @@ export function TradeStrategyTab({ leagueId }: TradeStrategyTabProps) {
                               <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                                 t.urgencyFlag === 'buy-low'
                                   ? 'bg-amber-900/40 text-amber-400'
-                                  : 'bg-orange-900/40 text-orange-400'
+                                  : 'bg-orange-800/60 text-orange-200'
                               }`}>
                                 {t.urgencyFlag === 'buy-low' ? '⬇ Buy Low' : '⏱ Act Soon'}
                               </span>
                             )}
                             {t.sellerContext && (
-                              <span className={`text-[11px] ${
-                                t.htcSignal === 'motivated-seller' ? 'text-green-400' :
-                                t.htcSignal === 'reluctant-seller' ? 'text-red-400' :
-                                t.availabilityScore >= 0.5 ? 'text-green-400' :
-                                t.availabilityScore >= 0.3 ? 'text-yellow-400' : 'text-gray-500'
-                              }`}>
+                              <span className="text-[11px] text-muted-foreground">
                                 {t.sellerContext}
                               </span>
                             )}
@@ -258,13 +253,13 @@ export function TradeStrategyTab({ leagueId }: TradeStrategyTabProps) {
                           <div>
                             <div className="text-gray-600 mb-1.5">They offer →</div>
                             <div className="space-y-1.5">
-                              {[...p.theyCanOffer].sort((a, b) => b.delta - a.delta).map((o) => (
-                                <div key={o.position} className="flex items-start gap-1.5">
+                              {[...p.theyCanOffer].sort((a, b) => b.delta - a.delta).map((o, oi) => (
+                                <div key={`${o.position}-${oi}`} className="flex items-start gap-1.5">
                                   <PosBadge pos={o.position} />
                                   <div>
                                     {o.topPlayer && (
                                       <div className="flex items-baseline gap-1.5 flex-wrap">
-                                        <span className="text-emerald-300 font-medium">{o.topPlayer}</span>
+                                        <span className="text-foreground font-medium">{o.topPlayer}</span>
                                         {o.topPlayerValue != null && o.topPlayerValue > 0 && (
                                           <span className="text-yellow-400 tabular-nums">{Math.round(o.topPlayerValue).toLocaleString()}</span>
                                         )}
@@ -276,7 +271,7 @@ export function TradeStrategyTab({ leagueId }: TradeStrategyTabProps) {
                                       </div>
                                     )}
                                     {!(o.rank === 0 && o.delta === 0) && (
-                                      <span className="text-emerald-500">#{o.rank} · +{o.delta.toFixed(1)} WAR</span>
+                                      <span className="text-muted-foreground">#{o.rank} · +{o.delta.toFixed(1)} WAR</span>
                                     )}
                                   </div>
                                 </div>
@@ -288,20 +283,20 @@ export function TradeStrategyTab({ leagueId }: TradeStrategyTabProps) {
                           <div>
                             <div className="text-gray-600 mb-1.5">You offer →</div>
                             <div className="space-y-1.5">
-                              {[...p.youCanOffer].sort((a, b) => b.delta - a.delta).map((o) => (
-                                <div key={o.position} className="flex items-start gap-1.5">
+                              {[...p.youCanOffer].sort((a, b) => b.delta - a.delta).map((o, oi) => (
+                                <div key={`${o.position}-${oi}`} className="flex items-start gap-1.5">
                                   <PosBadge pos={o.position} />
                                   <div>
                                     {o.topPlayer && (
                                       <div className="flex items-baseline gap-1.5">
-                                        <span className="text-brand-cyan font-medium">{o.topPlayer}</span>
+                                        <span className="text-foreground font-medium">{o.topPlayer}</span>
                                         {o.topPlayerValue != null && o.topPlayerValue > 0 && (
                                           <span className="text-yellow-400 tabular-nums">{Math.round(o.topPlayerValue).toLocaleString()}</span>
                                         )}
                                       </div>
                                     )}
                                     {!(o.rank === 0 && o.delta === 0) && (
-                                      <span className="text-brand-cyan/60">#{o.rank} · +{o.delta.toFixed(1)} WAR</span>
+                                      <span className="text-muted-foreground">#{o.rank} · +{o.delta.toFixed(1)} WAR</span>
                                     )}
                                   </div>
                                 </div>
