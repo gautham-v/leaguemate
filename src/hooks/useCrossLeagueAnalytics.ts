@@ -7,7 +7,6 @@ import { fetchLeagueDraftAnalysis } from './useLeagueDraftHistory';
 import type { AnalyzedTrade, ManagerTradeSummary } from '../types/trade';
 import type { AnalyzedPick, ManagerDraftSummary } from '../types/sleeper';
 import { assignGrade } from '../utils/draftCalculations';
-import { THIRTY_MIN_MS, FIFTEEN_MIN_MS } from '@/lib/constants';
 
 // ────────────────────────────────────────────────────────────
 // Types
