@@ -43,8 +43,15 @@ interface TradedAwayPick {
 // ---- Availability probability ----
 
 function computeAvailability(prospectRank: number, pickPosition: number): number {
-  const sigma = Math.max(1.5, 1 + prospectRank * 0.08);
-  return 1 / (1 + Math.exp(-(prospectRank - pickPosition) / sigma));
+  // P(available at pick P | prospect ranked R)
+  // The prospect is gone if they were taken by a pick before yours.
+  // Only (pickPosition - 1) teams pick before you, and they take the top-ranked prospects.
+  // If prospectRank > (pickPosition - 1), they can't have been taken yet.
+  // Logistic smooth: sigma increases with rank (later prospects have more variance).
+  const picksBefore = pickPosition - 1;
+  if (picksBefore === 0) return 1; // first pick — everyone is available
+  const sigma = Math.max(1.5, 1 + prospectRank * 0.06);
+  return 1 / (1 + Math.exp((picksBefore - prospectRank) / sigma));
 }
 
 function formatPickLabel(slot: number, numTeams: number): string {
@@ -82,8 +89,8 @@ function NeedBadge({ label }: { label: DraftBoardTarget['needLabel'] }) {
 
 function ScoreBadge({ score }: { score: number }) {
   return (
-    <span className="flex items-center justify-center gap-1 shrink-0">
-      <span className="text-[10px] text-muted-foreground/60">Value</span>
+    <span className="flex items-center gap-1 shrink-0">
+      <span className="text-[10px] text-muted-foreground/50 hidden sm:inline">Score</span>
       <span className={`text-xs font-bold tabular-nums ${score >= 70 ? 'text-foreground' : 'text-muted-foreground'}`}>
         {score.toFixed(0)}
       </span>
@@ -435,18 +442,6 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
   const [rookieSheetOpen, setRookieSheetOpen] = useState(false);
   const [expandedProspect, setExpandedProspect] = useState<number | null>(0); // auto-expand first
 
-  const reachableRanks = useMemo(() => {
-    if (userPickSlots.length === 0) return new Set<number>();
-    const set = new Set<number>();
-    for (const slot of userPickSlots) {
-      const classRank = slotToClassRank(slot, numTeams);
-      for (let r = classRank - 2; r <= classRank + 3; r++) {
-        if (r >= 1) set.add(r);
-      }
-    }
-    return set;
-  }, [userPickSlots, numTeams]);
-
   const anyLoading = isLoading || draftBoardLoading;
 
   const allTargets = useMemo(() => draftBoardData?.targets ?? [], [draftBoardData?.targets]);
@@ -569,19 +564,15 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
             {pageTargets.map((t, i) => {
               const globalIdx = page * PAGE_SIZE + i;
               const isExpanded = expandedProspect === globalIdx;
-              const isHighlighted = reachableRanks.has(t.overallRank);
-
               return (
-                <div key={globalIdx} className={isHighlighted ? 'bg-blue-500/5' : ''}>
+                <div key={globalIdx}>
                   {/* Collapsed row */}
                   <button
                     onClick={() => setExpandedProspect(isExpanded ? null : globalIdx)}
                     className="w-full flex items-center gap-2 px-3 sm:px-4 py-2.5 hover:bg-muted/10 transition-colors text-left"
                   >
                     {/* Rank */}
-                    <span className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold ${
-                      isHighlighted ? 'bg-blue-500/30 text-blue-300' : 'bg-card-border text-muted-foreground'
-                    }`}>
+                    <span className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold bg-card-border text-muted-foreground">
                       {globalIdx + 1}
                     </span>
 

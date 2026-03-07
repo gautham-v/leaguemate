@@ -176,8 +176,8 @@ export async function POST(req: NextRequest) {
       const p = sortedByValue[i];
       classRankMap.set(p.name, i + 1);
       posCounter[p.position] = (posCounter[p.position] ?? 0) + 1;
-      // Prefer stored position_rank from FantasyCalc; fall back to computed rank
-      classPosRankMap.set(p.name, p.position_rank ?? posCounter[p.position]);
+      // Always use computed position rank within class (FantasyCalc position_rank is overall, not per-position)
+      classPosRankMap.set(p.name, posCounter[p.position]);
     }
 
     // 6. Score each real prospect

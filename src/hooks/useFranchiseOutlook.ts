@@ -136,13 +136,41 @@ export function useFranchiseOutlook(leagueId: string | null) {
       ]);
 
       // 3. Season completeness + pace normalization
-      const weeksWithData = weekMatchups.filter(
+      let weeksWithData = weekMatchups.filter(
         (week) => week.some((m) => Object.keys(m.players_points ?? {}).length > 0),
       ).length;
-      const isSeasonComplete = weeksWithData === regularSeasonWeeks;
-      const seasonFactor = weeksWithData > 0 ? regularSeasonWeeks / weeksWithData : 1;
 
-      const rawPoints = computePlayerSeasonPoints(weekMatchups);
+      let effectiveMatchups = weekMatchups;
+      let effectiveRegularSeasonWeeks = regularSeasonWeeks;
+
+      // 3b. Pre-season fallback: when no games played yet, use previous season's data
+      // This lets us identify positional needs from 2025 WAR applied to 2026 rosters
+      if (weeksWithData === 0 && league.previous_league_id) {
+        try {
+          const prevLeague = await sleeperApi.getLeague(league.previous_league_id);
+          const prevPlayoffStart = prevLeague.settings.playoff_week_start || 15;
+          const prevRegularWeeks = prevPlayoffStart - 1;
+          const prevWeekNums = Array.from({ length: prevRegularWeeks }, (_, i) => i + 1);
+          const prevMatchups = await Promise.all(
+            prevWeekNums.map((w) => sleeperApi.getMatchups(league.previous_league_id!, w)),
+          );
+          const prevWeeksWithData = prevMatchups.filter(
+            (week) => week.some((m) => Object.keys(m.players_points ?? {}).length > 0),
+          ).length;
+          if (prevWeeksWithData > 0) {
+            effectiveMatchups = prevMatchups;
+            effectiveRegularSeasonWeeks = prevRegularWeeks;
+            weeksWithData = prevWeeksWithData;
+          }
+        } catch {
+          // Previous season fetch failed — continue with empty data
+        }
+      }
+
+      const isSeasonComplete = weeksWithData === effectiveRegularSeasonWeeks;
+      const seasonFactor = weeksWithData > 0 ? effectiveRegularSeasonWeeks / weeksWithData : 1;
+
+      const rawPoints = computePlayerSeasonPoints(effectiveMatchups);
       const playerSeasonPoints = new Map<string, number>();
       for (const [pid, pts] of rawPoints) {
         playerSeasonPoints.set(pid, pts * seasonFactor);

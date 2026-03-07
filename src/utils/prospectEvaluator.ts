@@ -300,8 +300,15 @@ function applyBayesianShrinkage(
   const n = raw.sampleSize;
   const w = n / (n + SHRINKAGE_K); // shrinkage weight toward comp pool
 
-  const shrunkElite   = w * (raw.elite / 100)   + (1 - w) * prior.pElite;
-  const shrunkStarter = w * (raw.starter / 100)  + (1 - w) * prior.pStarter;
+  let shrunkElite   = w * (raw.elite / 100)   + (1 - w) * prior.pElite;
+  let shrunkStarter = w * (raw.starter / 100)  + (1 - w) * prior.pStarter;
+
+  // Normalize elite+starter so they never exceed 1.0 (can happen when priors are high)
+  const topSum = shrunkElite + shrunkStarter;
+  if (topSum > 1) {
+    shrunkElite   *= 1 / topSum;
+    shrunkStarter *= 1 / topSum;
+  }
 
   // Rotational and bust: derive from remaining probability mass after elite+starter
   const remaining = Math.max(0, 1 - shrunkElite - shrunkStarter);

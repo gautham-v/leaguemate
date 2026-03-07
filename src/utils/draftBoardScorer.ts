@@ -66,7 +66,9 @@ export function scoreDraftTarget(input: ScorerInput): ScoringOutput {
     ?? compResults.distributions.year3;
   const pHit = dist ? (dist.elite + dist.starter) / 100 : 0.30;
   const pEliteRaw = dist ? dist.elite / 100 : 0.10;
-  const talentBonus = pHit * 15;
+  // Scale talent bonus by comp pool size — noisy small pools get less weight
+  const poolConfidence = Math.min(1, compResults.poolSize / 20);
+  const talentBonus = pHit * 15 * poolConfidence;
 
   // ── 3. Positional need adjustment (0–15): secondary signal ────────────────
   // Compressed significantly vs old formula (was 25). Need can only shift
