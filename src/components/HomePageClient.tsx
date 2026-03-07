@@ -112,6 +112,18 @@ export function HomePageClient() {
   // When ?lookup=true, skip auto-redirect so user can search a different username
   const isLookupMode = searchParams.get('lookup') === 'true';
 
+  // Fallback: if Supabase redirected the auth code to the root instead of /auth/callback,
+  // exchange it here and clean up the URL
+  useEffect(() => {
+    const code = searchParams.get('code');
+    if (!code) return;
+    const supabase = createClient();
+    supabase.auth.exchangeCodeForSession(code).then(() => {
+      // Remove ?code= from the URL without a full reload
+      router.replace('/');
+    });
+  }, [searchParams, router]);
+
   // Effect: if user is authenticated and has a linked Sleeper account, auto-load leagues
   // Skip this when in lookup mode (user wants to search a different username)
   useEffect(() => {
