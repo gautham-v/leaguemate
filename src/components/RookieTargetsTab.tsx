@@ -6,7 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useFranchiseOutlook } from '@/hooks/useFranchiseOutlook';
 import { useRosters, useLeagueUsers } from '@/hooks/useLeagueData';
 import { useSessionUser } from '@/hooks/useSessionUser';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import posthog from 'posthog-js';
 import { PosBadge } from '@/components/ui/badges';
 import type { DraftBoardRequest, DraftBoardTarget } from '@/types/sleeper';
 import type { CompPlayer } from '@/types/prospects';
@@ -221,6 +222,14 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
   }, [userPickSlots, upcomingDraft]);
 
   const anyLoading = isLoading || draftBoardLoading;
+
+  const draftBoardTracked = useRef(false);
+  useEffect(() => {
+    if (draftBoardData && !draftBoardTracked.current) {
+      draftBoardTracked.current = true;
+      posthog.capture('draft_board_viewed', { league_id: leagueId });
+    }
+  }, [draftBoardData, leagueId]);
 
   if (anyLoading) {
     return (

@@ -31,7 +31,7 @@ export type SidebarNavProps = {
 
 export function SidebarNav({
   league, leagueId, activeTab, allLeagueGroups, isOffseason, currentWeek,
-  isPro = false, cancelAtPeriodEnd = false, periodEnd = null,
+  isPro = false, cancelAtPeriodEnd: _cancelAtPeriodEnd = false, periodEnd: _periodEnd = null, // Phase 0: unused while Pro badge hidden
   onChangeLeague, onLockedLeague, onTabChange, onClose,
   onCareerStats, careerStatsActive = false,
   onViewMyProfile, myProfileActive = false,
@@ -169,6 +169,7 @@ export function SidebarNav({
           <>
             <div className="border-t border-card-border/40 my-2" />
             <div className="text-[10px] text-gray-600 uppercase tracking-widest px-3 mb-1">Your Account</div>
+            {/* Phase 0: Pro badge hidden — no paywall active
             {isPro && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 mb-1 bg-amber-400/10 rounded-xl border border-amber-400/20">
                 <Zap size={11} className="text-amber-400 flex-shrink-0" />
@@ -180,6 +181,7 @@ export function SidebarNav({
                 </span>
               </div>
             )}
+            */}
             {onViewMyProfile && (
               <button
                 onClick={() => { onViewMyProfile(); onClose?.(); }}

@@ -1,10 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase-browser';
-import { useSupabaseUser } from './useSupabaseUser';
-
+// Phase 0: All features free — no paywall until we have PostHog engagement data
+// to determine what to gate. Re-enable subscription checks in Phase 2.
+// Original implementation preserved below for when we activate the paywall.
 export function useSubscription(): { isPro: boolean; isLoading: boolean; cancelAtPeriodEnd: boolean; periodEnd: string | null } {
+  return { isPro: true, isLoading: false, cancelAtPeriodEnd: false, periodEnd: null };
+}
+
+/* --- Original subscription check (Phase 2) ---
+export function _useSubscriptionWithPaywall(): { isPro: boolean; isLoading: boolean; cancelAtPeriodEnd: boolean; periodEnd: string | null } {
   const { user, loading: userLoading } = useSupabaseUser();
   const [isPro, setIsPro] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,11 +35,8 @@ export function useSubscription(): { isPro: boolean; isLoading: boolean; cancelA
       .maybeSingle()
       .then(({ data }) => {
         setIsPro(!!data);
-        // Stripe may use either cancel_at_period_end (bool) or cancel_at (timestamp)
-        // to indicate a scheduled cancellation depending on how the portal cancels
         const isCanceling = data?.cancel_at_period_end || !!data?.cancel_at;
         setCancelAtPeriodEnd(isCanceling ?? false);
-        // Prefer cancel_at (absolute timestamp) over current_period_end for the display date
         setPeriodEnd(data?.cancel_at ?? data?.current_period_end ?? null);
         setIsLoading(false);
       });
@@ -43,3 +44,4 @@ export function useSubscription(): { isPro: boolean; isLoading: boolean; cancelA
 
   return { isPro, isLoading, cancelAtPeriodEnd, periodEnd };
 }
+*/

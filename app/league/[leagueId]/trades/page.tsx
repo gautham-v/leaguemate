@@ -18,14 +18,15 @@ type TradesPageTab = 'trades' | 'strategy' | 'simulator';
 
 // Inner component so hooks run unconditionally after data loads
 interface SimulatorContentProps {
+  leagueId: string;
   userId: string;
   data: FranchiseOutlookData;
 }
-function SimulatorContent({ userId, data }: SimulatorContentProps) {
+function SimulatorContent({ leagueId, userId, data }: SimulatorContentProps) {
   const beforeOutlook: FranchiseOutlookResult | null = data.outlookMap.get(userId) ?? null;
   const rawContext: FranchiseOutlookRawContext = data.rawContext;
   const simulator = useTradeSimulator(userId, rawContext, beforeOutlook);
-  return <TradeSimulatorPanel simulator={simulator} mode="fullpage" />;
+  return <TradeSimulatorPanel simulator={simulator} mode="fullpage" leagueId={leagueId} />;
 }
 
 export default function TradesPage() {
@@ -116,7 +117,7 @@ export default function TradesPage() {
               <span className="text-gray-400 text-sm">Computing franchise outlook…</span>
             </div>
           ) : franchiseOutlook.data && effectiveUserId ? (
-            <SimulatorContent userId={effectiveUserId} data={franchiseOutlook.data} />
+            <SimulatorContent leagueId={leagueId} userId={effectiveUserId} data={franchiseOutlook.data} />
           ) : (
             <div className="bg-card-bg border border-card-border rounded-2xl p-8 text-center">
               <div className="text-2xl mb-3">⚗️</div>

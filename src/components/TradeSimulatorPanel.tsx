@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import posthog from 'posthog-js';
 import { Loader2, X } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -20,6 +21,7 @@ import { PosBadge, TierBadge } from '@/components/ui/badges';
 interface TradeSimulatorPanelProps {
   simulator: TradeSimulatorResult;
   mode?: 'inline' | 'fullpage';
+  leagueId?: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -410,7 +412,7 @@ function AssetColumn({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function TradeSimulatorPanel({ simulator, mode = 'inline' }: TradeSimulatorPanelProps) {
+export function TradeSimulatorPanel({ simulator, mode = 'inline', leagueId }: TradeSimulatorPanelProps) {
   const {
     myBefore, myAfter, myDelta,
     theirBefore, theirAfter, theirDelta,
@@ -425,6 +427,21 @@ export function TradeSimulatorPanel({ simulator, mode = 'inline' }: TradeSimulat
   } = simulator;
 
   const [mobileSide, setMobileSide] = useState<'give' | 'receive'>('give');
+
+  // Track when a simulation result is computed (both sides have assets selected and delta is ready)
+  const tradeTracked = useRef(false);
+  useEffect(() => {
+    if (myAfter && myDelta && !tradeTracked.current) {
+      tradeTracked.current = true;
+      const assetsCount = selection.givePlayers.length + selection.givePicks.length
+        + selection.receivePlayers.length + selection.receivePicks.length;
+      posthog.capture('trade_simulated', { league_id: leagueId, assets_count: assetsCount });
+    }
+    // Reset tracking when selection is cleared so we can track the next simulation
+    if (!hasSelection) {
+      tradeTracked.current = false;
+    }
+  }, [myAfter, myDelta, hasSelection, selection, leagueId]);
 
   const hasCounterparty = counterpartyUserId !== null;
 

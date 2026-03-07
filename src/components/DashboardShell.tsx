@@ -17,8 +17,8 @@ import {
   ClipboardList,
   FlaskConical,
   Lock,
-  CreditCard,
-  Zap,
+  // CreditCard, // Phase 0: unused while paywall hidden
+  // Zap, // Phase 0: unused while paywall hidden
   Search,
   UserX,
 } from 'lucide-react';
@@ -170,12 +170,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     router.push(`/league/${id}/overview`);
   };
 
-  const handleManageSubscription = async () => {
-    const res = await fetch('/api/stripe/portal', { method: 'POST' });
-    if (!res.ok) return;
-    const { url } = await res.json() as { url: string };
-    if (url) window.location.href = url;
-  };
+  // Phase 0: subscription management hidden — no paywall active
+  // const handleManageSubscription = async () => {
+  //   const res = await fetch('/api/stripe/portal', { method: 'POST' });
+  //   if (!res.ok) return;
+  //   const { url } = await res.json() as { url: string };
+  //   if (url) window.location.href = url;
+  // };
 
   const handleSelectManager = (uid: string) => {
     router.push(`/league/${leagueId}/managers/${uid}`);
@@ -355,9 +356,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       <UserCircle size={20} className="text-muted-foreground" />
                     )}
                   </div>
+                  {/* Phase 0: PRO badge hidden — no paywall active
                   {isPro && (
                     <div className="absolute -bottom-1 -right-1 bg-amber-400 text-amber-900 text-[8px] font-black px-1 rounded-full leading-tight">PRO</div>
                   )}
+                  */}
                 </button>
                 {avatarMenuOpen && (
                   <div className="absolute right-0 top-full mt-2 w-56 bg-card-bg border border-card-border rounded-xl shadow-2xl z-30 overflow-hidden py-1">
@@ -365,6 +368,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       <div className="text-[10px] text-gray-500 uppercase tracking-wider">Signed in as</div>
                       <div className="text-sm font-semibold text-white truncate">{headerDisplayName}</div>
                     </div>
+                    {/* Phase 0: cancellation notice hidden — no paywall active
                     {isPro && cancelAtPeriodEnd && periodEnd && (
                       <div className="px-3 py-2 border-b border-card-border/60 flex items-center gap-2">
                         <Zap size={12} className="text-amber-400 flex-shrink-0" />
@@ -373,6 +377,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                         </span>
                       </div>
                     )}
+                    */}
                     <button
                       onClick={() => { setAvatarMenuOpen(false); handleChangeUser(); }}
                       className="w-full text-left px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2.5"
@@ -388,6 +393,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                         <UserX size={15} className="text-gray-500 flex-shrink-0" /> Change Sleeper account
                       </button>
                     )}
+                    {/* Phase 0: manage subscription hidden — no paywall active
                     {isPro && (
                       <button
                         onClick={() => { setAvatarMenuOpen(false); void handleManageSubscription(); }}
@@ -396,6 +402,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                         <CreditCard size={15} className="text-gray-500 flex-shrink-0" /> Manage subscription
                       </button>
                     )}
+                    */}
                   </div>
                 )}
               </div>
@@ -677,7 +684,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
 
-                {/* Pro status */}
+                {/* Phase 0: Pro status + manage subscription hidden — no paywall active
                 {isPro && (
                   <div className="flex items-center gap-2 bg-amber-400/10 border border-amber-400/20 rounded-xl px-3 py-2">
                     <Zap size={13} className="text-amber-400 flex-shrink-0" />
@@ -701,6 +708,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     Manage subscription
                   </button>
                 )}
+                */}
 
                 {userId && (
                   <button

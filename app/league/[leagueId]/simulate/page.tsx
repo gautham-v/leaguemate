@@ -37,7 +37,7 @@ function SimulateContent({ leagueId, userId, data }: SimulateContentProps) {
     posthog.capture('trade_simulator_used', { league_id: leagueId, manager_id: userId });
   }, [leagueId, userId]);
 
-  return <TradeSimulatorPanel simulator={simulator} mode="fullpage" />;
+  return <TradeSimulatorPanel simulator={simulator} mode="fullpage" leagueId={leagueId} />;
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────

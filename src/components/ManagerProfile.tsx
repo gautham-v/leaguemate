@@ -1,5 +1,6 @@
 'use client';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import posthog from 'posthog-js';
 import { useRouter } from 'next/navigation';
 import { Loader2, Trophy, Skull, ChevronLeft, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Swords, Star, Award, BarChart2, Users } from 'lucide-react';
 import { useLeagueHistory } from '../hooks/useLeagueData';
@@ -70,6 +71,20 @@ export function ManagerProfile({ leagueId, userId, onBack, onSelectManager, onVi
   const [playersView, setPlayersView] = useState<'current' | 'all'>('current');
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   const [htcSheetOpen, setHtcSheetOpen] = useState(false);
+  const htcTracked = useRef(false);
+
+  // Track tab views
+  useEffect(() => {
+    posthog.capture('manager_profile_tab_viewed', { tab: activeSection, league_id: leagueId, manager_id: userId });
+  }, [activeSection, leagueId, userId]);
+
+  // Track HTC verdicts viewed (once per mount when Players tab is active and data loads)
+  useEffect(() => {
+    if (activeSection === 'players' && recommendations.data && !htcTracked.current) {
+      htcTracked.current = true;
+      posthog.capture('htc_verdicts_viewed', { league_id: leagueId, manager_id: userId });
+    }
+  }, [activeSection, recommendations.data, leagueId, userId]);
 
   const allStats = useMemo(() => {
     if (!history) return new Map();

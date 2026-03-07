@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import posthog from 'posthog-js';
 import {
   ResponsiveContainer,
   LineChart,
@@ -128,7 +129,15 @@ export function FranchiseOutlookTab({ userId, data, leagueId, rawContext }: Fran
   const [cardModalOpen, setCardModalOpen] = useState(false);
   const pickRecs = usePickRecommendations(leagueId ?? null, userId);
 
+  const outlookTracked = useRef(false);
   const result = data.get(userId);
+
+  useEffect(() => {
+    if (result && !outlookTracked.current) {
+      outlookTracked.current = true;
+      posthog.capture('franchise_outlook_viewed', { league_id: leagueId, manager_id: userId });
+    }
+  }, [result, leagueId, userId]);
 
   if (!result) {
     return (

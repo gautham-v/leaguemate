@@ -13,12 +13,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await req.json() as {
-      priceId: string;
-      successUrl?: string;
-      cancelUrl?: string;
-    };
-    const { priceId, successUrl, cancelUrl } = body;
+    const body = await req.json() as { priceId: string };
+    const { priceId } = body;
 
     if (!priceId) {
       return NextResponse.json({ error: 'Missing priceId' }, { status: 400 });
@@ -59,16 +55,16 @@ export async function POST(req: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://leaguemate.fyi';
 
     const session = await stripe.checkout.sessions.create({
+      ui_mode: 'embedded',
       mode: 'subscription',
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: successUrl || `${appUrl}/`,
-      cancel_url: cancelUrl || `${appUrl}/`,
+      return_url: `${appUrl}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
       metadata: { userId: user.id },
       allow_promotion_codes: true,
     });
 
-    return NextResponse.json({ url: session.url });
+    return NextResponse.json({ clientSecret: session.client_secret });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });
