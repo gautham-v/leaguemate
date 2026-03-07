@@ -353,35 +353,75 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
     staleTime: 30 * 60 * 1000, // 30 minutes
   });
 
-  // Fetch upcoming 2026 dynasty draft to determine the user's pick slots
-  const { data: drafts } = useQuery({
-    queryKey: ['league-drafts', leagueId],
-    queryFn: () => sleeperApi.getDrafts(leagueId),
+  // Fetch the 2026 rookie draft. It may live under the current league or a successor league
+  // (when the current season is complete, Sleeper creates the next season as a new league).
+  const { data: rookieDraftData } = useQuery({
+    queryKey: ['rookie-draft-2026', leagueId],
+    queryFn: async () => {
+      // 1. Check current league's drafts first
+      const currentDrafts = await sleeperApi.getDrafts(leagueId);
+      const found = currentDrafts.find(
+        (d) => d.season === '2026' && (d.status === 'pre_draft' || d.status === 'paused'),
+      );
+      if (found) return found;
+
+      // 2. No 2026 draft here — look for successor league via any user in this league
+      const users = await sleeperApi.getLeagueUsers(leagueId);
+      const anyUserId = users[0]?.user_id;
+      if (!anyUserId) return null;
+
+      const userLeagues2026 = await sleeperApi.getUserLeagues(anyUserId, '2026');
+      const successor = userLeagues2026.find((l) => l.previous_league_id === leagueId);
+      if (!successor) return null;
+
+      const successorDrafts = await sleeperApi.getDrafts(successor.league_id);
+      return successorDrafts.find(
+        (d) => d.season === '2026' && (d.status === 'pre_draft' || d.status === 'paused'),
+      ) ?? null;
+    },
     enabled: !!leagueId,
     staleTime: 60 * 60 * 1000,
   });
 
-  // Find an upcoming / pre-draft rookie draft for 2026
-  const upcomingDraft = useMemo(() => {
-    if (!drafts) return null;
-    return drafts.find(
-      (d) => d.season === '2026' && (d.status === 'pre_draft' || d.status === 'paused'),
-    ) ?? null;
-  }, [drafts]);
+  const numTeams = rookieDraftData?.settings.teams ?? rosters?.length ?? 12;
 
-  // Determine which pick slot(s) the user's roster has in this draft
-  const userPickSlots = useMemo(() => {
-    if (!upcomingDraft?.slot_to_roster_id || !effectiveManager) return [];
-    const slots: number[] = [];
-    for (const [slot, rosterId] of Object.entries(upcomingDraft.slot_to_roster_id)) {
-      if (rosterId === effectiveManager.rosterId) {
-        slots.push(Number(slot));
+  // Build rosterId → draft slot map from the 2026 draft (handles both slot_to_roster_id and draft_order)
+  const rosterSlotMap = useMemo(() => {
+    const map = new Map<number, number>(); // rosterId → draft slot (1-based, global across rounds)
+    if (!rookieDraftData) return map;
+
+    if (rookieDraftData.slot_to_roster_id) {
+      // slot_to_roster_id: { "1": rosterId, "2": rosterId, ... } — invert it
+      for (const [slot, rosterId] of Object.entries(rookieDraftData.slot_to_roster_id)) {
+        map.set(rosterId, Number(slot));
+      }
+    } else if (rookieDraftData.draft_order && managers.length > 0) {
+      // draft_order: { userId: pickSlot } — map through managers to get rosterId
+      for (const [userId, slot] of Object.entries(rookieDraftData.draft_order)) {
+        const manager = managers.find((m) => m.userId === userId);
+        if (manager) map.set(manager.rosterId, slot as number);
       }
     }
-    return slots.sort((a, b) => a - b);
-  }, [upcomingDraft, effectiveManager]);
+    return map;
+  }, [rookieDraftData, managers]);
 
-  const numTeams = upcomingDraft?.settings.teams ?? 12;
+  // Compute the user's actual 2026 pick slots from their owned picks (including traded picks)
+  const userPickSlots = useMemo(() => {
+    if (rosterSlotMap.size === 0 || !effectiveManager) return [];
+    const futurePicks = userOutlook?.futurePicks ?? [];
+    const slots: number[] = [];
+    const nTeams = numTeams;
+    for (const pick of futurePicks) {
+      if (pick.season !== '2026') continue;
+      // The slot for this pick comes from the original owner's draft position
+      const originalSlot = rosterSlotMap.get(pick.roster_id);
+      if (originalSlot == null) continue;
+      // Convert to global slot: (round - 1) * numTeams + slot
+      const globalSlot = (pick.round - 1) * nTeams + originalSlot;
+      slots.push(globalSlot);
+    }
+    return slots.sort((a, b) => a - b);
+  }, [rosterSlotMap, effectiveManager, userOutlook, numTeams]);
 
   // Build draft capital: owned picks + traded-away picks for 2026
   const { ownedPicks, tradedAwayPicks } = useMemo(() => {
@@ -390,13 +430,20 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
     const myRosterId = effectiveManager?.rosterId;
     if (!myRosterId) return { ownedPicks: owned, tradedAwayPicks: tradedAway };
 
+    const nTeams = numTeams;
+
     // Picks this user owns for 2026 (from franchise outlook data)
     const futurePicks = userOutlook?.futurePicks ?? [];
     for (const pick of futurePicks) {
       if (pick.season !== '2026') continue;
+      // Resolve slot from rosterSlotMap (handles successor league draft_order)
+      const originalSlot = rosterSlotMap.get(pick.roster_id);
+      const globalSlot = originalSlot != null
+        ? (pick.round - 1) * nTeams + originalSlot
+        : undefined;
       owned.push({
         round: pick.round,
-        slot: pick.slot,
+        slot: globalSlot,
         isOwn: pick.roster_id === myRosterId,
         fromTeam: pick.roster_id !== myRosterId
           ? rosterIdToName.get(pick.roster_id) ?? `Team ${pick.roster_id}`
@@ -412,9 +459,13 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
         for (const pick of picks) {
           if (pick.season !== '2026') continue;
           if (pick.roster_id === myRosterId) {
+            const originalSlot = rosterSlotMap.get(pick.roster_id);
+            const globalSlot = originalSlot != null
+              ? (pick.round - 1) * nTeams + originalSlot
+              : undefined;
             tradedAway.push({
               round: pick.round,
-              slot: pick.slot,
+              slot: globalSlot,
               toTeam: rosterIdToName.get(ownerId) ?? `Team ${ownerId}`,
             });
           }
@@ -423,7 +474,7 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
     }
 
     return { ownedPicks: owned, tradedAwayPicks: tradedAway };
-  }, [effectiveManager, userOutlook, outlookData?.rawContext?.picksByRosterId, rosterIdToName]);
+  }, [effectiveManager, userOutlook, outlookData?.rawContext?.picksByRosterId, rosterIdToName, rosterSlotMap, numTeams]);
 
   const [page, setPage] = useState(0);
   const [positionFilter, setPositionFilter] = useState<string>('All');
