@@ -69,7 +69,7 @@ export function useFranchiseOutlook(leagueId: string | null) {
     queryKey: ['franchise-outlook', leagueId],
     queryFn: async (): Promise<FranchiseOutlookData> => {
       // 1. Fetch league metadata, rosters, users, all players, traded picks, drafts in parallel
-      const [league, rosters, leagueUsers, allPlayers, tradedPicks, drafts] = await Promise.all([
+      const [league, rosters, leagueUsers, allPlayers, tradedPicks, draftsRaw] = await Promise.all([
         sleeperApi.getLeague(leagueId!),
         sleeperApi.getRosters(leagueId!),
         sleeperApi.getLeagueUsers(leagueId!),
@@ -77,6 +77,24 @@ export function useFranchiseOutlook(leagueId: string | null) {
         sleeperApi.getTradedPicks(leagueId!),
         sleeperApi.getDrafts(leagueId!),
       ]);
+
+      // Also fetch successor league drafts (e.g. 2026 draft lives under successor league)
+      let drafts = draftsRaw;
+      const nextSeason = String(Number(league.season) + 1);
+      const hasNextSeasonDraft = draftsRaw.some((d) => d.season === nextSeason);
+      if (!hasNextSeasonDraft && leagueUsers.length > 0) {
+        try {
+          const anyUserId = leagueUsers[0].user_id;
+          const nextLeagues = await sleeperApi.getUserLeagues(anyUserId, nextSeason);
+          const successor = nextLeagues.find((l) => l.previous_league_id === leagueId);
+          if (successor) {
+            const successorDrafts = await sleeperApi.getDrafts(successor.league_id);
+            drafts = [...draftsRaw, ...successorDrafts];
+          }
+        } catch {
+          // Successor lookup failed — continue with current drafts only
+        }
+      }
 
       const playoffStart = league.settings.playoff_week_start || 15;
       const regularSeasonWeeks = playoffStart - 1;
@@ -177,11 +195,16 @@ export function useFranchiseOutlook(leagueId: string | null) {
       }
 
       // 7. Future picks by roster, annotated with slot number when available
+      // Include current-season picks if the draft hasn't happened yet (pre_draft / paused)
       const picksByRosterId = new Map<number, FutureDraftPick[]>();
       const currentSeasonNum = parseInt(league.season ?? '0');
+      const currentSeasonDraft = drafts.find(
+        (d) => d.season === league.season && (d.status === 'pre_draft' || d.status === 'paused'),
+      );
+      const futureSeasonFloor = currentSeasonDraft ? currentSeasonNum : currentSeasonNum + 1;
       for (const pick of tradedPicks) {
         if (pick.owner_id == null) continue;
-        if (parseInt(pick.season) <= currentSeasonNum) continue;
+        if (parseInt(pick.season) < futureSeasonFloor) continue;
         const slot = rosterToSlotBySeason.get(pick.season)?.get(pick.roster_id);
         const annotatedPick: FutureDraftPick = slot != null ? { ...pick, slot } : pick;
         const arr = picksByRosterId.get(pick.owner_id) ?? [];
@@ -193,14 +216,14 @@ export function useFranchiseOutlook(leagueId: string | null) {
       // Determine future season × round combos from upcoming drafts and traded pick seasons.
       const futurePickDimensions = new Map<string, Set<number>>(); // season → rounds
       for (const pick of tradedPicks) {
-        if (parseInt(pick.season) > currentSeasonNum) {
+        if (parseInt(pick.season) >= futureSeasonFloor) {
           const rounds = futurePickDimensions.get(pick.season) ?? new Set<number>();
           rounds.add(pick.round);
           futurePickDimensions.set(pick.season, rounds);
         }
       }
       for (const draft of drafts) {
-        if (parseInt(draft.season) > currentSeasonNum) {
+        if (parseInt(draft.season) >= futureSeasonFloor) {
           const rounds = futurePickDimensions.get(draft.season) ?? new Set<number>();
           for (let r = 1; r <= (draft.settings.rounds ?? 3); r++) rounds.add(r);
           futurePickDimensions.set(draft.season, rounds);

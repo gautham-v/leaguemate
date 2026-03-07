@@ -287,7 +287,9 @@ function buildPickAssets(
       ownerUserId: userId,
       season: p.season,
       round: p.round,
-      displayLabel: `${p.season} Rd ${p.round}`,
+      displayLabel: p.slot != null
+        ? `${p.season} ${p.round}.${p.slot.toString().padStart(2, '0')}`
+        : `${p.season} Rd ${p.round}`,
     }));
 }
 

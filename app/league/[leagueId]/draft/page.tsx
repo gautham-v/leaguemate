@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { X } from 'lucide-react';
 import { DraftLeaderboard } from '@/components/DraftLeaderboard';
 import { RookieTargetsTab } from '@/components/RookieTargetsTab';
 import { ShareButton } from '@/components/ShareButton';
@@ -18,35 +19,47 @@ function getRookieSeasonDefaults() {
   return { isRookieSeason, daysUntilDraft, showCountdown };
 }
 
+function getCountdownDismissed(): boolean {
+  if (typeof window === 'undefined') return true;
+  return localStorage.getItem('draft-countdown-dismissed') === 'true';
+}
+
 export default function DraftPage() {
   const { leagueId } = useParams<{ leagueId: string }>();
   const router = useRouter();
   const { daysUntilDraft, showCountdown } = getRookieSeasonDefaults();
   const [activeTab, setActiveTab] = useState<DraftPageTab>('rookies');
+  const [countdownDismissed, setCountdownDismissed] = useState(getCountdownDismissed);
+
+  const dismissCountdown = () => {
+    localStorage.setItem('draft-countdown-dismissed', 'true');
+    setCountdownDismissed(true);
+  };
 
   return (
     <div>
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">Draft Hub</h2>
-          <p className="text-gray-400 text-sm">
-            Leaderboard grades past dynasty drafts — Draft Board builds your personalized 2026 rookie targets.
-          </p>
-        </div>
-        <ShareButton className="mt-1" />
+      <div className="flex items-start justify-between mb-3">
+        <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Draft Hub</h2>
+        <ShareButton className="mt-0.5" />
       </div>
 
-      {showCountdown && (
-        <div className="mb-5 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2.5 flex items-center gap-3">
+      {showCountdown && !countdownDismissed && (
+        <div className="mb-4 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2 flex items-center gap-3">
           <span className="text-base">🏈</span>
-          <span className="text-sm text-amber-400">
+          <span className="text-sm text-amber-400 flex-1">
             <span className="font-semibold">NFL Draft in {daysUntilDraft} days</span>
-            <span className="opacity-70 ml-2">— check the Draft Board tab</span>
           </span>
+          <button
+            onClick={dismissCountdown}
+            className="text-amber-400/60 hover:text-amber-400 transition-colors shrink-0"
+            aria-label="Dismiss"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 
-      <div className="flex border-b border-card-border mb-6">
+      <div className="flex border-b border-card-border mb-5">
         <button
           onClick={() => setActiveTab('rookies')}
           className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${

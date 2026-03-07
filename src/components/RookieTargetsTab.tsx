@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, Zap, ChevronLeft, ChevronRight, ArrowRightLeft } from 'lucide-react';
+import { Loader2, Zap, ChevronLeft, ChevronRight, ChevronDown, ArrowRightLeft, HelpCircle, Users } from 'lucide-react';
 import { RookieMethodologySheet } from './methodology/RookieMethodologySheet';
 import { useQuery } from '@tanstack/react-query';
 import { useFranchiseOutlook } from '@/hooks/useFranchiseOutlook';
@@ -9,6 +9,7 @@ import { useSessionUser } from '@/hooks/useSessionUser';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import posthog from 'posthog-js';
 import { PosBadge } from '@/components/ui/badges';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import type { DraftBoardRequest, DraftBoardTarget } from '@/types/sleeper';
 import type { CompPlayer } from '@/types/prospects';
 import { sleeperApi } from '@/api/sleeper';
@@ -30,7 +31,7 @@ interface DraftCapitalPick {
   round: number;
   slot?: number;
   isOwn: boolean;
-  fromTeam?: string; // team name if acquired
+  fromTeam?: string;
 }
 
 interface TradedAwayPick {
@@ -42,8 +43,6 @@ interface TradedAwayPick {
 // ---- Availability probability ----
 
 function computeAvailability(prospectRank: number, pickPosition: number): number {
-  // Logistic model: P(available at pick P | prospect ranked R)
-  // Higher rank = picked earlier, so if R < P the prospect is likely gone
   const sigma = Math.max(1.5, 1 + prospectRank * 0.08);
   return 1 / (1 + Math.exp(-(prospectRank - pickPosition) / sigma));
 }
@@ -62,37 +61,32 @@ function slotToClassRank(slot: number, numTeams: number): number {
 
 // ---- Helper sub-components ----
 
-function NeedLabelBadge({ label }: { label: DraftBoardTarget['needLabel'] }) {
+function NeedBadge({ label }: { label: DraftBoardTarget['needLabel'] }) {
   if (label === 'Critical Need') {
     return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">
-        Critical Need
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30">
+        Critical
       </span>
     );
   }
   if (label === 'Need') {
     return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-400/80 border border-amber-500/20">
         Need
       </span>
     );
   }
-  return (
-    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-zinc-700 text-zinc-400 dark:bg-zinc-700 dark:text-zinc-400">
-      Value
-    </span>
-  );
+  // "Value" — no badge, absence means value pick
+  return null;
 }
 
-function TargetScoreBadge({ score }: { score: number }) {
-  const rounded = score.toFixed(0);
-  const colorCls =
-    score >= 80 ? 'text-green-400' :
-    score >= 60 ? 'text-yellow-400' :
-    'text-zinc-500';
+function ScoreBadge({ score }: { score: number }) {
   return (
-    <span className={`text-xs font-bold tabular-nums ${colorCls}`} title="Roster fit score (0–100)">
-      {rounded}
+    <span className="flex items-center justify-center gap-1 shrink-0">
+      <span className="text-[10px] text-muted-foreground/60">Value</span>
+      <span className={`text-xs font-bold tabular-nums ${score >= 70 ? 'text-foreground' : 'text-muted-foreground'}`}>
+        {score.toFixed(0)}
+      </span>
     </span>
   );
 }
@@ -100,37 +94,24 @@ function TargetScoreBadge({ score }: { score: number }) {
 function TimelineBadge({ badge }: { badge: DraftBoardTarget['timelineBadge'] }) {
   if (badge === 'immediate') {
     return (
-      <span className="inline-flex items-center gap-0.5 text-xs text-green-400">
-        <Zap size={10} className="flex-shrink-0" />
+      <span className="inline-flex items-center gap-0.5 text-xs text-foreground font-medium">
+        <Zap size={10} className="shrink-0" />
         Day-1 impact
       </span>
     );
   }
   if (badge === 'year2') {
-    return <span className="text-xs text-yellow-400">Yr 2 impact</span>;
+    return <span className="text-xs text-muted-foreground">Yr 2 impact</span>;
   }
-  return <span className="text-xs text-zinc-500">Yr 3+ impact</span>;
-}
-
-function ConfidenceDot({ confidence }: { confidence: DraftBoardTarget['confidence'] }) {
-  const colorCls =
-    confidence === 'high' ? 'bg-green-500' :
-    confidence === 'medium' ? 'bg-yellow-500' :
-    'bg-red-500';
-  return (
-    <span
-      className={`inline-block w-1.5 h-1.5 rounded-full ${colorCls} flex-shrink-0`}
-      title={`Confidence: ${confidence}`}
-    />
-  );
+  return <span className="text-xs text-muted-foreground/60">Yr 3+ impact</span>;
 }
 
 function CompPills({ comps, isArchetype }: { comps: CompPlayer[]; isArchetype?: boolean }) {
   if (isArchetype || comps.length === 0) return null;
   const shown = comps.slice(0, 3);
   return (
-    <div className="flex items-center gap-1.5 flex-wrap mt-1">
-      <span className="text-xs text-zinc-600">Comps:</span>
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <span className="text-[10px] text-muted-foreground/60">Comps:</span>
       {shown.map((c, i) => {
         const pts = c.year2PPR ?? c.year1PPR;
         const label = pts != null
@@ -139,7 +120,7 @@ function CompPills({ comps, isArchetype }: { comps: CompPlayer[]; isArchetype?: 
         return (
           <span
             key={i}
-            className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] bg-zinc-800 text-zinc-400 border border-zinc-700"
+            className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] bg-card-bg text-muted-foreground border border-card-border"
           >
             {label}
           </span>
@@ -149,7 +130,7 @@ function CompPills({ comps, isArchetype }: { comps: CompPlayer[]; isArchetype?: 
   );
 }
 
-function AvailabilityBadge({
+function AvailabilityInline({
   prospectRank,
   userPickSlots,
   numTeams,
@@ -160,37 +141,28 @@ function AvailabilityBadge({
 }) {
   if (userPickSlots.length === 0) return null;
 
-  // Compute availability at each user pick, show only the best (earliest with meaningful chance)
   const pickAvailabilities = userPickSlots.map((slot) => {
     const classRank = slotToClassRank(slot, numTeams);
     const pAvail = computeAvailability(prospectRank, classRank);
     return { slot, classRank, pAvail, label: formatPickLabel(slot, numTeams) };
   });
 
-  // Find the earliest pick where availability is >= 5%
   const best = pickAvailabilities.find((p) => p.pAvail >= 0.05);
   if (!best) return null;
 
-  // Round to nearest 5% for less false precision
   const pct = Math.round(best.pAvail * 20) * 5;
   if (pct === 0) return null;
 
-  const colorCls =
-    pct >= 65 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
-    pct >= 30 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
-    'text-zinc-400 bg-zinc-500/10 border-zinc-500/20';
-
   return (
-    <span
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border tabular-nums ${colorCls}`}
-      title={`~${pct}% chance this prospect is still available at pick ${best.label}`}
-    >
+    <span className="text-xs text-muted-foreground tabular-nums">
       ~{pct}% at {best.label}
     </span>
   );
 }
 
-function DraftCapitalCard({
+// ---- Draft Capital (collapsible) ----
+
+function DraftCapitalSection({
   owned,
   tradedAway,
   numTeams,
@@ -205,82 +177,80 @@ function DraftCapitalCard({
   });
   const sortedTraded = [...tradedAway].sort((a, b) => a.round - b.round);
 
+  // Build compact summary for collapsed state
+  const summaryParts = sortedOwned.map((p) => {
+    const label = ROUND_LABELS[p.round] ?? `${p.round}th`;
+    const slotLabel = p.slot ? ` (${formatPickLabel(p.slot, numTeams)})` : '';
+    return `${label}${slotLabel}`;
+  });
+  const summaryText = summaryParts.join(', ') || 'No picks';
+
   return (
-    <div className="bg-card-bg border border-card-border rounded-2xl p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <ArrowRightLeft size={14} className="text-muted-foreground" />
-        <span className="text-sm font-semibold text-foreground">2026 Draft Capital</span>
-      </div>
+    <Collapsible>
+      <CollapsibleTrigger className="group w-full flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-card-bg border border-card-border rounded-xl hover:bg-muted/10 transition-colors text-left">
+        <ArrowRightLeft size={13} className="text-muted-foreground shrink-0" />
+        <span className="text-xs font-semibold text-foreground shrink-0">2026 Capital</span>
+        <span className="text-xs text-muted-foreground truncate flex-1">{summaryText}</span>
+        <ChevronDown size={14} className="text-muted-foreground shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-2 bg-card-bg border border-card-border rounded-xl p-3 space-y-2">
+          {/* Owned picks */}
+          {sortedOwned.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {sortedOwned.map((p, i) => {
+                const slotLabel = p.slot ? formatPickLabel(p.slot, numTeams) : null;
+                return (
+                  <div
+                    key={`own-${i}`}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md border border-card-border bg-muted/5 text-xs"
+                  >
+                    <span className="font-semibold text-foreground">
+                      {ROUND_LABELS[p.round] ?? `${p.round}th`}
+                    </span>
+                    {slotLabel && (
+                      <span className="text-muted-foreground/60 tabular-nums">({slotLabel})</span>
+                    )}
+                    {p.isOwn ? (
+                      <span className="text-muted-foreground/50">own</span>
+                    ) : (
+                      <span className="text-emerald-400/80">via {p.fromTeam}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">
+              No 2026 picks — all draft capital has been traded away.
+            </p>
+          )}
 
-      {/* Owned picks */}
-      {sortedOwned.length > 0 ? (
-        <div className="flex flex-wrap gap-2 mb-2">
-          {sortedOwned.map((p, i) => {
-            const slotLabel = p.slot
-              ? formatPickLabel(p.slot, numTeams)
-              : null;
-            const borderCls = p.isOwn
-              ? 'border-blue-500/20 bg-blue-500/5'
-              : 'border-emerald-500/20 bg-emerald-500/5';
-            return (
-              <div
-                key={`own-${i}`}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${borderCls}`}
-              >
-                <span className="text-xs font-semibold text-foreground">
-                  {ROUND_LABELS[p.round] ?? `${p.round}th`}
-                </span>
-                {slotLabel && (
-                  <span className="text-[10px] text-muted-foreground tabular-nums">
-                    ({slotLabel})
-                  </span>
-                )}
-                {p.isOwn ? (
-                  <span className="text-[10px] text-zinc-500">own</span>
-                ) : (
-                  <span className="text-[10px] text-emerald-400">
-                    via {p.fromTeam}
-                  </span>
-                )}
-              </div>
-            );
-          })}
+          {/* Traded away picks */}
+          {sortedTraded.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {sortedTraded.map((p, i) => {
+                const slotLabel = p.slot ? formatPickLabel(p.slot, numTeams) : null;
+                return (
+                  <div
+                    key={`away-${i}`}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md border border-card-border/50 opacity-50 text-xs"
+                  >
+                    <span className="font-medium text-muted-foreground line-through">
+                      {ROUND_LABELS[p.round] ?? `${p.round}th`}
+                    </span>
+                    {slotLabel && (
+                      <span className="text-muted-foreground tabular-nums line-through">({slotLabel})</span>
+                    )}
+                    <span className="text-red-400/80">to {p.toTeam}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-      ) : (
-        <p className="text-xs text-muted-foreground italic mb-2">
-          No 2026 picks — all draft capital has been traded away.
-        </p>
-      )}
-
-      {/* Traded away picks */}
-      {sortedTraded.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {sortedTraded.map((p, i) => {
-            const slotLabel = p.slot
-              ? formatPickLabel(p.slot, numTeams)
-              : null;
-            return (
-              <div
-                key={`away-${i}`}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-red-500/15 bg-red-500/5 opacity-60"
-              >
-                <span className="text-xs font-medium text-muted-foreground line-through">
-                  {ROUND_LABELS[p.round] ?? `${p.round}th`}
-                </span>
-                {slotLabel && (
-                  <span className="text-[10px] text-muted-foreground tabular-nums line-through">
-                    ({slotLabel})
-                  </span>
-                )}
-                <span className="text-[10px] text-red-400">
-                  to {p.toTeam}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -309,7 +279,6 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
       .filter((m) => !!m.userId);
   }, [rosters, leagueUsers]);
 
-  // Build rosterId → team name map for pick provenance
   const rosterIdToName = useMemo(() => {
     const map = new Map<number, string>();
     for (const m of managers) {
@@ -326,7 +295,6 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
 
   const userOutlook = outlookData?.outlookMap.get(effectiveUserId);
 
-  // Build the request body for the draft-board API
   const draftBoardRequestBody: DraftBoardRequest = {
     draftYear: 2026,
     warByPosition: userOutlook?.warByPosition ?? [],
@@ -350,22 +318,18 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
       return res.json() as Promise<DraftBoardResponse>;
     },
     enabled: !isLoading && !!effectiveUserId,
-    staleTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 30 * 60 * 1000,
   });
 
-  // Fetch the 2026 rookie draft. It may live under the current league or a successor league
-  // (when the current season is complete, Sleeper creates the next season as a new league).
   const { data: rookieDraftData } = useQuery({
     queryKey: ['rookie-draft-2026', leagueId],
     queryFn: async () => {
-      // 1. Check current league's drafts first
       const currentDrafts = await sleeperApi.getDrafts(leagueId);
       const found = currentDrafts.find(
         (d) => d.season === '2026' && (d.status === 'pre_draft' || d.status === 'paused'),
       );
       if (found) return found;
 
-      // 2. No 2026 draft here — look for successor league via any user in this league
       const users = await sleeperApi.getLeagueUsers(leagueId);
       const anyUserId = users[0]?.user_id;
       if (!anyUserId) return null;
@@ -385,18 +349,15 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
 
   const numTeams = rookieDraftData?.settings.teams ?? rosters?.length ?? 12;
 
-  // Build rosterId → draft slot map from the 2026 draft (handles both slot_to_roster_id and draft_order)
   const rosterSlotMap = useMemo(() => {
-    const map = new Map<number, number>(); // rosterId → draft slot (1-based, global across rounds)
+    const map = new Map<number, number>();
     if (!rookieDraftData) return map;
 
     if (rookieDraftData.slot_to_roster_id) {
-      // slot_to_roster_id: { "1": rosterId, "2": rosterId, ... } — invert it
       for (const [slot, rosterId] of Object.entries(rookieDraftData.slot_to_roster_id)) {
         map.set(rosterId, Number(slot));
       }
     } else if (rookieDraftData.draft_order && managers.length > 0) {
-      // draft_order: { userId: pickSlot } — map through managers to get rosterId
       for (const [userId, slot] of Object.entries(rookieDraftData.draft_order)) {
         const manager = managers.find((m) => m.userId === userId);
         if (manager) map.set(manager.rosterId, slot as number);
@@ -405,7 +366,6 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
     return map;
   }, [rookieDraftData, managers]);
 
-  // Compute the user's actual 2026 pick slots from their owned picks (including traded picks)
   const userPickSlots = useMemo(() => {
     if (rosterSlotMap.size === 0 || !effectiveManager) return [];
     const futurePicks = userOutlook?.futurePicks ?? [];
@@ -413,17 +373,14 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
     const nTeams = numTeams;
     for (const pick of futurePicks) {
       if (pick.season !== '2026') continue;
-      // The slot for this pick comes from the original owner's draft position
       const originalSlot = rosterSlotMap.get(pick.roster_id);
       if (originalSlot == null) continue;
-      // Convert to global slot: (round - 1) * numTeams + slot
       const globalSlot = (pick.round - 1) * nTeams + originalSlot;
       slots.push(globalSlot);
     }
     return slots.sort((a, b) => a - b);
   }, [rosterSlotMap, effectiveManager, userOutlook, numTeams]);
 
-  // Build draft capital: owned picks + traded-away picks for 2026
   const { ownedPicks, tradedAwayPicks } = useMemo(() => {
     const owned: DraftCapitalPick[] = [];
     const tradedAway: TradedAwayPick[] = [];
@@ -432,11 +389,9 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
 
     const nTeams = numTeams;
 
-    // Picks this user owns for 2026 (from franchise outlook data)
     const futurePicks = userOutlook?.futurePicks ?? [];
     for (const pick of futurePicks) {
       if (pick.season !== '2026') continue;
-      // Resolve slot from rosterSlotMap (handles successor league draft_order)
       const originalSlot = rosterSlotMap.get(pick.roster_id);
       const globalSlot = originalSlot != null
         ? (pick.round - 1) * nTeams + originalSlot
@@ -451,7 +406,6 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
       });
     }
 
-    // Picks traded away: scan all rosters' picks for ones originally from myRosterId
     const picksByRosterId = outlookData?.rawContext?.picksByRosterId;
     if (picksByRosterId) {
       for (const [ownerId, picks] of picksByRosterId) {
@@ -479,9 +433,8 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
   const [page, setPage] = useState(0);
   const [positionFilter, setPositionFilter] = useState<string>('All');
   const [rookieSheetOpen, setRookieSheetOpen] = useState(false);
+  const [expandedProspect, setExpandedProspect] = useState<number | null>(0); // auto-expand first
 
-  // Which class ranks are within reach of the user's pick slot(s)?
-  // Must be before any early returns to satisfy Rules of Hooks.
   const reachableRanks = useMemo(() => {
     if (userPickSlots.length === 0) return new Set<number>();
     const set = new Set<number>();
@@ -496,10 +449,9 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
 
   const anyLoading = isLoading || draftBoardLoading;
 
-  const allTargets = draftBoardData?.targets ?? [];
+  const allTargets = useMemo(() => draftBoardData?.targets ?? [], [draftBoardData?.targets]);
   const isPreDraft = draftBoardData?.isPreDraft ?? false;
 
-  // Position filter: counts and available positions
   const positionCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const t of allTargets) {
@@ -539,56 +491,55 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Manager selector */}
-      {managers.length > 0 && (
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground flex-shrink-0">Viewing:</span>
-          <select
-            value={effectiveUserId}
-            onChange={(e) => { setSelectedUserId(e.target.value); setPage(0); }}
-            className="bg-card-bg border border-card-border rounded-lg px-3 py-2 text-sm text-foreground"
-          >
-            {managers.map((m) => (
-              <option key={m.userId} value={m.userId}>
-                {m.displayName}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Position filter pills */}
-      {availablePositions.length > 1 && (
-        <div className="flex gap-2 flex-wrap">
-          {availablePositions.map(pos => (
-            <button
-              key={pos}
-              onClick={() => { setPositionFilter(pos); setPage(0); }}
-              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                positionFilter === pos
-                  ? 'bg-brand-cyan/20 text-brand-cyan border-brand-cyan/40'
-                  : 'bg-card-bg text-muted-foreground border-card-border hover:text-foreground'
-              }`}
+    <div className="space-y-3">
+      {/* Merged filter bar: manager selector + position pills */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {managers.length > 0 && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Users size={14} className="text-muted-foreground" />
+            <select
+              value={effectiveUserId}
+              onChange={(e) => { setSelectedUserId(e.target.value); setPage(0); setExpandedProspect(0); }}
+              className="bg-card-bg border border-card-border rounded-lg px-2 py-1.5 text-sm text-foreground"
             >
-              {pos === 'All' ? `All (${allTargets.length})` : `${pos} (${positionCounts.get(pos) ?? 0})`}
-            </button>
-          ))}
-        </div>
-      )}
+              {managers.map((m) => (
+                <option key={m.userId} value={m.userId}>
+                  {m.displayName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
-      {/* Pre-draft disclaimer */}
+        {availablePositions.length > 1 && (
+          <div className="flex gap-1.5 flex-wrap">
+            {availablePositions.map(pos => (
+              <button
+                key={pos}
+                onClick={() => { setPositionFilter(pos); setPage(0); setExpandedProspect(0); }}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  positionFilter === pos
+                    ? 'bg-brand-cyan/20 text-brand-cyan border-brand-cyan/40'
+                    : 'bg-card-bg text-muted-foreground border-card-border hover:text-foreground'
+                }`}
+              >
+                {pos === 'All' ? `All (${allTargets.length})` : `${pos} (${positionCounts.get(pos) ?? 0})`}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Pre-draft disclaimer — compact inline */}
       {isPreDraft && (
-        <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-          <span className="text-amber-400 text-xs leading-relaxed">
-            <span className="font-semibold">Pre-draft rankings</span> — values are consensus estimates. Will auto-update with real pick data after the NFL Draft (April 24).
-          </span>
-        </div>
+        <p className="text-xs text-amber-400/80 px-1">
+          <span className="font-medium">Pre-draft rankings</span> — consensus estimates, auto-updates after NFL Draft (April 24).
+        </p>
       )}
 
-      {/* Draft Capital Card */}
+      {/* Draft Capital — collapsible, collapsed by default */}
       {(ownedPicks.length > 0 || tradedAwayPicks.length > 0) && (
-        <DraftCapitalCard
+        <DraftCapitalSection
           owned={ownedPicks}
           tradedAway={tradedAwayPicks}
           numTeams={numTeams}
@@ -599,150 +550,156 @@ export function RookieTargetsTab({ leagueId }: RookieTargetsTabProps) {
       {draftBoardError && !anyLoading && (
         <div className="bg-card-bg border border-card-border rounded-2xl p-8 text-center">
           <div className="text-sm font-medium text-zinc-300">Could not load draft board</div>
-          <div className="text-xs text-muted-foreground mt-1">
-            Please try again later.
-          </div>
+          <div className="text-xs text-muted-foreground mt-1">Please try again later.</div>
         </div>
       )}
 
-      {/* Targets list */}
+      {/* Empty filter state */}
       {!draftBoardError && allTargets.length > 0 && targets.length === 0 && (
         <div className="bg-card-bg border border-card-border rounded-2xl p-8 text-center">
           <div className="text-sm font-medium text-zinc-300">No {positionFilter} prospects in the current class</div>
-          <div className="text-xs text-muted-foreground mt-1">
-            Try selecting a different position or view all prospects.
-          </div>
+          <div className="text-xs text-muted-foreground mt-1">Try selecting a different position.</div>
         </div>
       )}
 
+      {/* Prospect list */}
       {!draftBoardError && targets.length > 0 ? (
-        <div className="bg-card-bg border border-card-border rounded-2xl p-5">
-          <div className="flex items-baseline justify-between gap-2 mb-1">
-            <div className="text-sm font-semibold text-foreground">Your Draft Board</div>
-            <button
-              onClick={() => setRookieSheetOpen(true)}
-              className="text-xs text-muted-foreground hover:text-white transition-colors flex-shrink-0"
-            >
-              How rankings work →
-            </button>
-          </div>
-          <div className="text-xs text-muted-foreground mb-3">
-            Dynasty value is the primary driver — need and timeline provide a modest fit adjustment
-          </div>
-          <div className="flex items-center gap-3 mb-4 pb-3 border-b border-card-border/50">
-            <span className="text-[11px] text-zinc-600">Score = dynasty value + roster fit</span>
-            <span className="text-[11px] text-zinc-600">· Impact = when they contribute</span>
-            <span className="text-[11px] text-zinc-600">· Comps = historical players at same position rank</span>
-          </div>
-
-          <div className="space-y-4">
+        <div className="bg-card-bg border border-card-border rounded-2xl overflow-hidden">
+          <div className="divide-y divide-card-border/40">
             {pageTargets.map((t, i) => {
               const globalIdx = page * PAGE_SIZE + i;
+              const isExpanded = expandedProspect === globalIdx;
               const isHighlighted = reachableRanks.has(t.overallRank);
+
               return (
-                <div
-                  key={globalIdx}
-                  className={`flex items-start gap-2.5 ${isHighlighted ? 'bg-blue-500/5 -mx-2 px-2 py-1 rounded-lg' : ''}`}
-                >
-                  {/* Rank number */}
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5 ${isHighlighted ? 'bg-blue-500/30' : 'bg-card-border'}`}>
-                    <span className="text-[10px] font-semibold text-muted-foreground">{globalIdx + 1}</span>
-                  </div>
+                <div key={globalIdx} className={isHighlighted ? 'bg-blue-500/5' : ''}>
+                  {/* Collapsed row */}
+                  <button
+                    onClick={() => setExpandedProspect(isExpanded ? null : globalIdx)}
+                    className="w-full flex items-center gap-2 px-3 sm:px-4 py-2.5 hover:bg-muted/10 transition-colors text-left"
+                  >
+                    {/* Rank */}
+                    <span className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold ${
+                      isHighlighted ? 'bg-blue-500/30 text-blue-300' : 'bg-card-border text-muted-foreground'
+                    }`}>
+                      {globalIdx + 1}
+                    </span>
 
-                  {/* Position badge */}
-                  <PosBadge pos={t.position} />
+                    <PosBadge pos={t.position} />
 
-                  {/* Main content */}
-                  <div className="flex-1 min-w-0">
-                    {/* Row 1: name + badges */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm text-foreground truncate">
-                        {t.isArchetype ? `~${t.name}` : t.name}
-                      </span>
-                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-auto">
-                        <NeedLabelBadge label={t.needLabel} />
-                        <TargetScoreBadge score={t.targetScore} />
+                    <span className="text-sm text-foreground font-medium flex-1 truncate">
+                      {t.isArchetype ? `~${t.name}` : t.name}
+                    </span>
+
+                    <NeedBadge label={t.needLabel} />
+                    <ScoreBadge score={t.targetScore} />
+
+                    {isExpanded
+                      ? <ChevronDown size={14} className="text-muted-foreground shrink-0" />
+                      : <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+                    }
+                  </button>
+
+                  {/* Expanded detail */}
+                  {isExpanded && (
+                    <div className="px-3 sm:px-4 pb-3 space-y-1.5">
+                      {/* Rankings & timeline */}
+                      <div className="flex items-center gap-2 flex-wrap text-xs pl-7">
+                        <span className="text-muted-foreground">
+                          #{t.overallRank} in class · #{t.positionRank} {t.position}
+                        </span>
+                        <span className="text-card-border">·</span>
+                        <TimelineBadge badge={t.timelineBadge} />
+                        {t.surplusFlag && (
+                          <>
+                            <span className="text-card-border">·</span>
+                            <span className="text-emerald-400 font-medium">Value</span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Outcome probabilities + availability */}
+                      <div className="flex items-center gap-2 flex-wrap text-xs pl-7">
+                        <span className="text-muted-foreground">
+                          <span className="font-semibold text-foreground">{Math.round(t.pStarter)}%</span> starter
+                        </span>
+                        <span className="text-card-border">·</span>
+                        <span className="text-muted-foreground">
+                          <span className="font-semibold text-foreground">{Math.round(t.pElite)}%</span> elite
+                        </span>
+                        {t.confidence !== 'high' && (
+                          <>
+                            <span className="text-card-border">·</span>
+                            <span className="text-muted-foreground/60">{t.confidence} confidence</span>
+                          </>
+                        )}
+                        {userPickSlots.length > 0 && (
+                          <>
+                            <span className="text-card-border">·</span>
+                            <AvailabilityInline
+                              prospectRank={t.overallRank}
+                              userPickSlots={userPickSlots}
+                              numTeams={numTeams}
+                            />
+                          </>
+                        )}
+                      </div>
+
+                      {/* Reason + impact */}
+                      {(t.reason || t.impactSummary) && (
+                        <div className="text-xs text-muted-foreground/80 leading-snug pl-7">
+                          {t.reason}
+                          {t.reason && t.impactSummary && ' — '}
+                          {t.impactSummary}
+                        </div>
+                      )}
+
+                      {/* Comps */}
+                      <div className="pl-7">
+                        <CompPills comps={t.comps} isArchetype={t.isArchetype} />
                       </div>
                     </div>
-
-                    {/* Row 2: rank info + timeline + surplus */}
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className="text-xs text-zinc-500">
-                        #{t.overallRank} in class · #{t.positionRank} {t.position}
-                      </span>
-                      <span className="text-zinc-600 text-xs">·</span>
-                      <TimelineBadge badge={t.timelineBadge} />
-                      {t.surplusFlag && (
-                        <span className="text-xs text-green-400 font-medium">↑ Value</span>
-                      )}
-                    </div>
-
-                    {/* Row 3: probability + confidence + availability */}
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className="text-xs text-zinc-400">
-                        <span className="font-semibold">{Math.round(t.pStarter)}%</span>
-                        <span className="text-zinc-600 ml-0.5">starter</span>
-                      </span>
-                      <span className="text-zinc-600 text-xs">·</span>
-                      <span className="text-xs text-zinc-400">
-                        <span className="font-semibold">{Math.round(t.pElite)}%</span>
-                        <span className="text-zinc-600 ml-0.5">elite</span>
-                      </span>
-                      <ConfidenceDot confidence={t.confidence} />
-                      {userPickSlots.length > 0 && (
-                        <>
-                          <span className="text-zinc-600 text-xs">·</span>
-                          <AvailabilityBadge
-                            prospectRank={t.overallRank}
-                            userPickSlots={userPickSlots}
-                            numTeams={numTeams}
-                          />
-                        </>
-                      )}
-                    </div>
-
-                    {/* Reason text */}
-                    {t.reason && (
-                      <div className="text-xs text-zinc-500 mt-0.5 leading-snug">{t.reason}</div>
-                    )}
-
-                    {/* Impact summary */}
-                    {t.impactSummary && (
-                      <div className="text-xs text-zinc-500 mt-0.5 leading-snug">{t.impactSummary}</div>
-                    )}
-
-                    {/* Comp pills */}
-                    <CompPills comps={t.comps} isArchetype={t.isArchetype} />
-                  </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
-          {/* Pagination */}
+          {/* Pagination + methodology link */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-5 pt-4 border-t border-card-border/50">
+            <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-t border-card-border/50">
               <button
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                onClick={() => { setPage((p) => Math.max(0, p - 1)); setExpandedProspect(0); }}
                 disabled={page === 0}
-                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft size={14} />
                 Previous
               </button>
-              <span className="text-xs text-zinc-500">
-                {page + 1} / {totalPages} · {targets.length}{positionFilter !== 'All' ? ` ${positionFilter}` : ''} prospect{targets.length !== 1 ? 's' : ''}
+              <span className="text-xs text-muted-foreground/60">
+                {page + 1} / {totalPages} · {targets.length} prospect{targets.length !== 1 ? 's' : ''}
               </span>
               <button
-                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                onClick={() => { setPage((p) => Math.min(totalPages - 1, p + 1)); setExpandedProspect(0); }}
                 disabled={page === totalPages - 1}
-                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 Next
                 <ChevronRight size={14} />
               </button>
             </div>
           )}
+
+          {/* Methodology link in footer */}
+          <div className="flex items-center justify-center px-3 sm:px-4 py-2.5 border-t border-card-border/50">
+            <button
+              onClick={() => setRookieSheetOpen(true)}
+              className="flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-foreground transition-colors"
+            >
+              <HelpCircle size={12} />
+              How rankings work
+            </button>
+          </div>
         </div>
       ) : (
         !draftBoardError && !anyLoading && allTargets.length === 0 && (
