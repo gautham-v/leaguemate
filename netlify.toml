@@ -3,6 +3,7 @@
   publish = ".next"
 
 [build.environment]
+  NEXT_PUBLIC_APP_URL = "https://leaguemate.fyi"
   NEXT_PUBLIC_SUPABASE_URL = "https://huhowbvebjhafbqhiaci.supabase.co"
   NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_hcdVSHbJZ0EErhrg_n1wBA_Jvfdeyrc"
 

@@ -219,7 +219,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     void createClient().auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(pathname)}`,
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://leaguemate.fyi'}/auth/callback?next=${encodeURIComponent(pathname)}`,
         queryParams: { prompt: 'select_account' },
       },
     });

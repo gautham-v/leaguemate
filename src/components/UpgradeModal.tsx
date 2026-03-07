@@ -52,7 +52,7 @@ export function UpgradeModal({ leagueCount, onClose }: UpgradeModalProps) {
     await createClient().auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${next}`,
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://leaguemate.fyi'}/auth/callback?next=${next}`,
         queryParams: { prompt: 'select_account' },
       },
     });
