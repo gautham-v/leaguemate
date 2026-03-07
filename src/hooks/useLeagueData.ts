@@ -309,6 +309,40 @@ export function useDashboardData(leagueId: string | null) {
     staleTime: THIRTY_MIN_MS,
   });
 
+  // Fetch previous league's champion when current bracket is empty (preseason)
+  const previousLeagueId = league.data?.previous_league_id;
+  const hasPreviousLeague = !!previousLeagueId && previousLeagueId !== '0';
+  const currentBracketEmpty = !bracket.data || (bracket.data as BracketMatch[]).length === 0 ||
+    !(bracket.data as BracketMatch[]).some((b: BracketMatch) => b.w != null);
+  const prevChampion = useQuery({
+    queryKey: ['prev-champion', previousLeagueId],
+    queryFn: async () => {
+      const [prevBracket, prevRosters, prevUsers] = await Promise.all([
+        sleeperApi.getWinnersBracket(previousLeagueId!),
+        sleeperApi.getRosters(previousLeagueId!),
+        sleeperApi.getLeagueUsers(previousLeagueId!),
+      ]);
+      const typedBracket = (prevBracket ?? []) as BracketMatch[];
+      let finalMatch = typedBracket.find((b) => b.p === 1);
+      if (!finalMatch) {
+        const maxRound = Math.max(...typedBracket.map((b) => b.r));
+        finalMatch = typedBracket.find((b) => b.r === maxRound);
+      }
+      if (!finalMatch?.w) return null;
+      const winnerRoster = prevRosters.find((r) => r.roster_id === finalMatch!.w);
+      if (!winnerRoster?.owner_id) return null;
+      const winnerUser = prevUsers.find((u) => u.user_id === winnerRoster.owner_id);
+      return {
+        teamName: winnerUser?.metadata?.team_name ?? winnerUser?.display_name ?? `Team ${winnerRoster.roster_id}`,
+        displayName: winnerUser?.display_name ?? `Team ${winnerRoster.roster_id}`,
+        avatar: winnerUser?.avatar ?? null,
+        userId: winnerRoster.owner_id,
+      };
+    },
+    enabled: hasPreviousLeague && currentBracketEmpty,
+    staleTime: THIRTY_MIN_MS,
+  });
+
   const isLoading =
     league.isLoading ||
     rosters.isLoading ||
@@ -332,7 +366,7 @@ export function useDashboardData(leagueId: string | null) {
     const { userMap, rosterMap } = buildUserMap(users.data, rosters.data);
     const standings = buildStandings(rosters.data, userMap);
 
-    // Determine champion from winners bracket
+    // Determine champion from winners bracket, fall back to previous league's champion
     const typedBracket = (bracket.data ?? []) as BracketMatch[];
     let champion: { teamName: string; displayName: string; avatar: string | null; userId: string } | null = null;
     if (typedBracket.length > 0) {
@@ -352,6 +386,10 @@ export function useDashboardData(leagueId: string | null) {
           };
         }
       }
+    }
+    // Preseason fallback: use previous league's champion
+    if (!champion && prevChampion.data) {
+      champion = prevChampion.data;
     }
 
     if (!allMatchups.data || allMatchups.data.length === 0) {
@@ -447,7 +485,7 @@ export function useLeagueRecords(leagueId: string | null) {
                 teamName: u?.metadata?.team_name ?? u?.display_name ?? `Team ${r.roster_id}`,
                 wins: r.settings.wins,
                 losses: r.settings.losses,
-                pointsFor: r.settings.fpts + (r.settings.fpts_decimal ?? 0) / 100,
+                pointsFor: (r.settings.fpts ?? 0) + (r.settings.fpts_decimal ?? 0) / 100,
               },
             ];
           })
@@ -637,8 +675,8 @@ export function useLeagueHistory(leagueId: string | null) {
             avatar: u?.avatar ?? null,
             wins: r.settings.wins,
             losses: r.settings.losses,
-            pointsFor: r.settings.fpts + (r.settings.fpts_decimal ?? 0) / 100,
-            pointsAgainst: r.settings.fpts_against + (r.settings.fpts_against_decimal ?? 0) / 100,
+            pointsFor: (r.settings.fpts ?? 0) + (r.settings.fpts_decimal ?? 0) / 100,
+            pointsAgainst: (r.settings.fpts_against ?? 0) + (r.settings.fpts_against_decimal ?? 0) / 100,
             streak: r.metadata?.streak,
             rank: idx + 1,
           });

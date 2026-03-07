@@ -19,6 +19,9 @@ export function Standings({ standings, onSelectManager, draftSurplusByUserId, sh
   const hasPlayoffData = standings.some(
     (s) => (s.playoffWins ?? 0) > 0 || (s.playoffLosses ?? 0) > 0
   );
+  const isPreseason = standings.every(
+    (s) => s.wins === 0 && s.losses === 0 && s.pointsFor === 0
+  );
 
   return (
     <>
@@ -102,10 +105,10 @@ export function Standings({ standings, onSelectManager, draftSurplusByUserId, sh
                   </button>
                 </TableCell>
                 <TableCell className="py-3 px-2 text-center font-semibold text-foreground">
-                  {team.wins}
+                  {isPreseason ? <span className="text-muted-foreground/40">—</span> : team.wins}
                 </TableCell>
                 <TableCell className="py-3 px-2 text-center text-muted-foreground">
-                  {team.losses}
+                  {isPreseason ? <span className="text-muted-foreground/40">—</span> : team.losses}
                 </TableCell>
                 {hasPlayoffData && (
                   <TableCell className="py-3 px-2 text-center hidden sm:table-cell">
@@ -118,14 +121,22 @@ export function Standings({ standings, onSelectManager, draftSurplusByUserId, sh
                     )}
                   </TableCell>
                 )}
-                <TableCell className="py-3 px-2 text-right text-white tabular-nums text-sm hidden sm:table-cell">
-                  {team.pointsFor.toFixed(1)}
+                <TableCell className="py-3 px-2 text-right tabular-nums text-sm hidden sm:table-cell">
+                  {isPreseason ? (
+                    <span className="text-muted-foreground/40">—</span>
+                  ) : (
+                    <span className="text-white">{team.pointsFor.toFixed(1)}</span>
+                  )}
                 </TableCell>
-                <TableCell className="py-3 px-2 text-right text-muted-foreground tabular-nums text-sm hidden sm:table-cell">
-                  {team.pointsAgainst.toFixed(1)}
+                <TableCell className="py-3 px-2 text-right tabular-nums text-sm hidden sm:table-cell">
+                  {isPreseason ? (
+                    <span className="text-muted-foreground/40">—</span>
+                  ) : (
+                    <span className="text-muted-foreground">{team.pointsAgainst.toFixed(1)}</span>
+                  )}
                 </TableCell>
                 <TableCell className="py-3 px-2 pr-4 text-right hidden sm:table-cell">
-                  {team.streak ? (
+                  {!isPreseason && team.streak ? (
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-muted text-foreground">
                       {team.streak}
                     </span>

@@ -67,8 +67,8 @@ export function buildStandings(
         wins: r.settings.wins,
         losses: r.settings.losses,
         ties: r.settings.ties,
-        pointsFor: r.settings.fpts + (r.settings.fpts_decimal ?? 0) / 100,
-        pointsAgainst: r.settings.fpts_against + (r.settings.fpts_against_decimal ?? 0) / 100,
+        pointsFor: (r.settings.fpts ?? 0) + (r.settings.fpts_decimal ?? 0) / 100,
+        pointsAgainst: (r.settings.fpts_against ?? 0) + (r.settings.fpts_against_decimal ?? 0) / 100,
         pointsForDecimal: r.settings.fpts_decimal ?? 0,
         streak: r.metadata?.streak,
       };

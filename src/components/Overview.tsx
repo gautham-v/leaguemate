@@ -25,6 +25,9 @@ export function Overview({ computed, userId, onViewMyProfile, onSelectManager }:
   const totalTeams = standings.length;
   const myLuck = luckIndex.find((s) => s.userId === userId) ?? null;
   const myPowerRank = powerRankings.find((s) => s.userId === userId) ?? null;
+  const isPreseason = standings.every(
+    (s) => s.wins === 0 && s.losses === 0 && s.pointsFor === 0
+  );
 
   return (
     <div className="space-y-6">
@@ -78,63 +81,76 @@ export function Overview({ computed, userId, onViewMyProfile, onSelectManager }:
                       <div className="text-xl font-bold text-brand-cyan tabular-nums">#{myRank}</div>
                       <div className="text-xs text-muted-foreground">of {totalTeams}</div>
                     </div>
-                    <div>
-                      <div className="text-xl font-bold text-white tabular-nums">
-                        {myStanding.wins}–{myStanding.losses}
+                    {isPreseason ? (
+                      <div>
+                        <div className="text-xl font-bold text-muted-foreground">Preseason</div>
+                        <div className="text-xs text-muted-foreground">No games yet</div>
                       </div>
-                      <div className="text-xs text-muted-foreground">Record</div>
-                    </div>
-                    <div>
-                      <div className="text-xl font-bold text-white tabular-nums">
-                        {myStanding.pointsFor.toFixed(0)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">Points For</div>
-                    </div>
+                    ) : (
+                      <>
+                        <div>
+                          <div className="text-xl font-bold text-white tabular-nums">
+                            {myStanding.wins}–{myStanding.losses}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Record</div>
+                        </div>
+                        <div>
+                          <div className="text-xl font-bold text-white tabular-nums">
+                            {myStanding.pointsFor.toFixed(0)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Points For</div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
             </CardContent>
 
-            <CollapsibleContent>
-              <div className="px-4 pb-4 flex flex-wrap gap-3 border-t border-border pt-3">
-                <div>
-                  <div className="text-base font-bold text-white tabular-nums">
-                    {myStanding.pointsAgainst.toFixed(0)}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Points Against</div>
-                </div>
-                {myStanding.streak && (
-                  <div>
-                    <div className="text-base font-bold text-white tabular-nums">{myStanding.streak}</div>
-                    <div className="text-xs text-muted-foreground">Streak</div>
-                  </div>
-                )}
-                {myPowerRank && (
-                  <div>
-                    <div className="text-base font-bold text-white tabular-nums">#{myPowerRank.rank}</div>
-                    <div className="text-xs text-muted-foreground">Power Rank</div>
-                  </div>
-                )}
-                {myLuck && (
-                  <div>
-                    <div className={`text-base font-bold tabular-nums ${myLuck.luckScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {myLuck.luckScore >= 0 ? '+' : ''}{myLuck.luckScore.toFixed(1)}
+            {!isPreseason && (
+              <>
+                <CollapsibleContent>
+                  <div className="px-4 pb-4 flex flex-wrap gap-3 border-t border-border pt-3">
+                    <div>
+                      <div className="text-base font-bold text-white tabular-nums">
+                        {myStanding.pointsAgainst.toFixed(0)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Points Against</div>
                     </div>
-                    <div className="text-xs text-muted-foreground">Luck Score</div>
+                    {myStanding.streak && (
+                      <div>
+                        <div className="text-base font-bold text-white tabular-nums">{myStanding.streak}</div>
+                        <div className="text-xs text-muted-foreground">Streak</div>
+                      </div>
+                    )}
+                    {myPowerRank && (
+                      <div>
+                        <div className="text-base font-bold text-white tabular-nums">#{myPowerRank.rank}</div>
+                        <div className="text-xs text-muted-foreground">Power Rank</div>
+                      </div>
+                    )}
+                    {myLuck && (
+                      <div>
+                        <div className={`text-base font-bold tabular-nums ${myLuck.luckScore >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {myLuck.luckScore >= 0 ? '+' : ''}{myLuck.luckScore.toFixed(1)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Luck Score</div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </CollapsibleContent>
+                </CollapsibleContent>
 
-            <CollapsibleTrigger asChild>
-              <button className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs text-muted-foreground hover:text-foreground border-t border-border hover:bg-muted/20 transition-colors">
-                {statsOpen ? (
-                  <>Less <ChevronUp size={12} /></>
-                ) : (
-                  <>More stats <ChevronDown size={12} /></>
-                )}
-              </button>
-            </CollapsibleTrigger>
+                <CollapsibleTrigger asChild>
+                  <button className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs text-muted-foreground hover:text-foreground border-t border-border hover:bg-muted/20 transition-colors">
+                    {statsOpen ? (
+                      <>Less <ChevronUp size={12} /></>
+                    ) : (
+                      <>More stats <ChevronDown size={12} /></>
+                    )}
+                  </button>
+                </CollapsibleTrigger>
+              </>
+            )}
           </Card>
         </Collapsible>
       )}

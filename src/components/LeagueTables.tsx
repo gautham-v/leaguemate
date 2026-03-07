@@ -141,9 +141,31 @@ export function LeagueTables({ computed, leagueId, onSelectManager }: LeagueTabl
     }
   }
 
+  // For rankings: fall back to most recent completed season when current season has no data
+  const currentRankingsEmpty = isCurrentSeason && computed.powerRankings.length === 0;
+  const fallbackRankingsSeason = useMemo(() => {
+    if (!currentRankingsEmpty || !history || history.length < 2) return null;
+    // Find the most recent season that isn't the current one
+    const sorted = [...history].sort((a, b) => Number(b.season) - Number(a.season));
+    return sorted.find((s) => s.season !== currentSeasonYear) ?? null;
+  }, [currentRankingsEmpty, history, currentSeasonYear]);
+
+  const fallbackRankings = useMemo(() => {
+    if (!fallbackRankingsSeason) return null;
+    const standings = buildStandingsFromHistory(fallbackRankingsSeason);
+    const regular = fallbackRankingsSeason.matchups.filter((m) => !m.isPlayoff);
+    if (regular.length === 0) return null;
+    const maxWeek = Math.max(...regular.map((m) => m.week));
+    return calcPowerRankings(regular, standings, maxWeek);
+  }, [fallbackRankingsSeason]);
+
   const displayRankings = effectiveSeason === 'alltime'
     ? null
-    : (isCurrentSeason ? computed.powerRankings : seasonRankings) ?? [];
+    : (isCurrentSeason
+        ? (computed.powerRankings.length > 0 ? computed.powerRankings : fallbackRankings)
+        : seasonRankings) ?? [];
+
+  const isRankingsFallback = isCurrentSeason && computed.powerRankings.length === 0 && !!fallbackRankings;
 
   const selectedLabel = effectiveSeason === 'alltime' ? 'All-Time' : effectiveSeason;
 
@@ -212,12 +234,14 @@ export function LeagueTables({ computed, leagueId, onSelectManager }: LeagueTabl
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" collisionPadding={8} className="min-w-[120px]">
-            <DropdownMenuItem
-              className={effectiveSeason === 'alltime' ? 'text-brand-cyan' : ''}
-              onClick={() => setSelectedSeason('alltime')}
-            >
-              All-Time
-            </DropdownMenuItem>
+            {activeLeagueTab !== 'rankings' && (
+              <DropdownMenuItem
+                className={effectiveSeason === 'alltime' ? 'text-brand-cyan' : ''}
+                onClick={() => setSelectedSeason('alltime')}
+              >
+                All-Time
+              </DropdownMenuItem>
+            )}
             {availableSeasons.map((season) => (
               <DropdownMenuItem
                 key={season}
@@ -265,11 +289,20 @@ export function LeagueTables({ computed, leagueId, onSelectManager }: LeagueTabl
               </div>
             </div>
           ) : displayRankings && displayRankings.length > 0 ? (
-            <PowerRankings
-              rankings={displayRankings}
-              standings={displayStandings ?? []}
-              onSelectManager={onSelectManager}
-            />
+            <>
+              {isRankingsFallback && fallbackRankingsSeason && (
+                <p className="text-xs text-muted-foreground mb-4">
+                  Showing {fallbackRankingsSeason.season} final rankings — {currentSeasonYear} rankings begin after Week 1
+                </p>
+              )}
+              <PowerRankings
+                rankings={displayRankings}
+                standings={isRankingsFallback && fallbackRankingsSeason
+                  ? buildStandingsFromHistory(fallbackRankingsSeason)
+                  : displayStandings ?? []}
+                onSelectManager={onSelectManager}
+              />
+            </>
           ) : (
             <div className="py-8 text-center text-muted-foreground text-sm">
               No power rankings data available
