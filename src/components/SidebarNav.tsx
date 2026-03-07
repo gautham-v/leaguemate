@@ -31,7 +31,7 @@ export type SidebarNavProps = {
 
 export function SidebarNav({
   league, leagueId, activeTab, allLeagueGroups, isOffseason, currentWeek,
-  isPro = false, cancelAtPeriodEnd: _cancelAtPeriodEnd = false, periodEnd: _periodEnd = null, // Phase 0: unused while Pro badge hidden
+  isPro = false,
   onChangeLeague, onLockedLeague, onTabChange, onClose,
   onCareerStats, careerStatsActive = false,
   onViewMyProfile, myProfileActive = false,

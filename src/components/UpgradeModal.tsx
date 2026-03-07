@@ -23,6 +23,7 @@ export function UpgradeModal({ leagueCount, onClose }: UpgradeModalProps) {
 
   useEffect(() => {
     if (!loading) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setView(user ? 'upgrade' : 'signin');
     }
   }, [loading, user]);
